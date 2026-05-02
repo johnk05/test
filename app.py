@@ -1159,8 +1159,8 @@ def show_recommendations(recommendations):
         )
 
 
-def build_improvement_plan(row, prediction, weekly_hours, focus_goal, plan_intensity):
-    """Create a focused weekly improvement plan from user-selected goals."""
+def build_improvement_plan(row, prediction, focus_goal=None, plan_intensity="Focused"):
+    """Create a focused weekly improvement plan from student metrics."""
     quiz_score = float(row.get("quiz_score", 0))
     consistency = float(row.get("consistency_index", 0))
     interaction = float(row.get("interaction_level", 0))
@@ -1191,15 +1191,26 @@ def build_improvement_plan(row, prediction, weekly_hours, focus_goal, plan_inten
         priority_scores["Concept Revision"] += 15
         priority_scores["Consistency Building"] += 15
 
-    goal_boosts = {
+    # Map goals to internal keys
+    goal_map = {
         "Improve quiz score": "Quiz Practice",
         "Build consistency": "Consistency Building",
         "Finish modules": "Module Completion",
         "Improve assignments": "Assignments",
         "Increase engagement": "Engagement",
-        "Balanced improvement": None,
     }
-    boosted_area = goal_boosts.get(focus_goal)
+
+    # Automatically determine the best goal if not provided
+    if focus_goal is None or focus_goal == "Auto-Detect":
+        best_internal_goal = max(priority_scores, key=priority_scores.get)
+        # Find the human-readable version
+        focus_goal = "Balanced improvement"
+        for label, internal in goal_map.items():
+            if internal == best_internal_goal and priority_scores[internal] > 20:
+                focus_goal = label
+                break
+
+    boosted_area = goal_map.get(focus_goal)
     if boosted_area:
         priority_scores[boosted_area] += 35
 
@@ -1210,15 +1221,10 @@ def build_improvement_plan(row, prediction, weekly_hours, focus_goal, plan_inten
     else:
         selected_areas = sorted(priority_scores, key=priority_scores.get, reverse=True)[:5]
 
-    total_priority = sum(priority_scores[area] for area in selected_areas) or len(selected_areas)
     allocation_rows = []
     for area in selected_areas:
-        hours = weekly_hours * (priority_scores[area] / total_priority)
-        allocation_rows.append({"Focus Area": area, "Hours": round(hours, 1)})
-
-    allocated = sum(item["Hours"] for item in allocation_rows)
-    if allocation_rows and allocated != weekly_hours:
-        allocation_rows[0]["Hours"] = round(allocation_rows[0]["Hours"] + (weekly_hours - allocated), 1)
+        score = priority_scores[area]
+        allocation_rows.append({"Focus Area": area, "Priority Weight": round(score, 1)})
 
     actions = []
     if "Concept Revision" in selected_areas:
@@ -1234,24 +1240,18 @@ def build_improvement_plan(row, prediction, weekly_hours, focus_goal, plan_inten
     if "Module Completion" in selected_areas:
         actions.append("Finish pending modules first, then revise completed modules briefly.")
 
-    return pd.DataFrame(allocation_rows), actions
+    return pd.DataFrame(allocation_rows), actions, focus_goal
 
 
 def show_interactive_recommendations(recommendations, row, prediction):
-    """Interactive recommendation planner controlled by the user."""
+    """Interactive recommendation planner tailored to the student."""
     control_col, summary_col = st.columns([1, 1.2])
 
     with control_col:
-        weekly_hours = st.slider(
-            "Weekly study hours you can commit",
-            min_value=2,
-            max_value=40,
-            value=12,
-            step=1,
-        )
         focus_goal = st.selectbox(
             "Main improvement goal",
             [
+                "Auto-Detect",
                 "Balanced improvement",
                 "Improve quiz score",
                 "Build consistency",
@@ -1266,22 +1266,35 @@ def show_interactive_recommendations(recommendations, row, prediction):
             horizontal=True,
         )
 
-    allocation_df, focused_actions = build_improvement_plan(
+    allocation_df, focused_actions, final_goal = build_improvement_plan(
         row=row,
         prediction=prediction,
-        weekly_hours=weekly_hours,
         focus_goal=focus_goal,
         plan_intensity=plan_intensity,
     )
 
     with summary_col:
-        st.metric("Weekly Hours", weekly_hours)
+        st.metric("Detected Goal", final_goal)
         st.metric("Focused Actions", len(focused_actions))
         st.metric("Predicted Level", prediction)
 
     st.subheader("Your Weekly Focus Plan")
+    st.markdown('<div class="section-kicker">Recommended focus areas based on your behavioral signals and performance prediction.</div>', unsafe_allow_html=True)
     st.dataframe(allocation_df, use_container_width=True, hide_index=True)
-    st.bar_chart(allocation_df.set_index("Focus Area"), use_container_width=True)
+    
+    # Use Priority Weight instead of Hours
+    comparison_chart = (
+        alt.Chart(allocation_df)
+        .mark_bar(cornerRadiusEnd=4)
+        .encode(
+            x=alt.X("Priority Weight:Q", title="Priority Weight"),
+            y=alt.Y("Focus Area:N", sort="-x", title=None),
+            color=alt.Color("Priority Weight:Q", scale=alt.Scale(scheme="purples"), legend=None),
+            tooltip=["Focus Area", "Priority Weight"],
+        )
+        .properties(height=260)
+    )
+    st.altair_chart(comparison_chart, use_container_width=True)
 
     st.subheader("Priority Actions")
     for index, action in enumerate(focused_actions, start=1):
@@ -1670,7 +1683,7 @@ def main():
         st.error("The selected dataset has no rows.")
         st.stop()
 
-    active_context_key = f"{dataset_key}:{model_name}"
+    active_context_key = f"{dataset_key}:{model_name}:{student_id}"
     if "prediction_result" not in st.session_state:
         st.session_state.prediction_result = None
     if st.session_state.get("active_context_key") != active_context_key:
@@ -1698,36 +1711,33 @@ def main():
         st.metric("Models", len(MODEL_PATHS))
         st.caption("Use the dashboard tabs to review prediction, profile, quiz behavior, charts, recommendations, and risks.")
 
-    if predict_clicked:
+    # Automate prediction when student selection changes
+    if st.session_state.prediction_result is None:
         try:
             model = load_model(model_name)
             student_row = df[df["student_id"] == int(student_id)]
 
             if student_row.empty:
                 st.session_state.prediction_result = None
-                st.error(f"Student ID {int(student_id)} was not found in the dataset.")
-                return
+            else:
+                student_row = student_row.copy()
+                row = student_row.iloc[0]
+                prediction = predict_student(student_row, model, scaler, label_encoder, columns)
+                recommendation_result = get_recommendation(prediction, row)
+                quiz_analysis = analyze_quiz_performance(row)
 
-            student_row = student_row.copy()
-            row = student_row.iloc[0]
-            prediction = predict_student(student_row, model, scaler, label_encoder, columns)
-            recommendation_result = get_recommendation(prediction, row)
-            quiz_analysis = analyze_quiz_performance(row)
-
-            st.session_state.prediction_result = {
-                "model_name": model_name,
-                "dataset_name": dataset_name,
-                "student_row": student_row,
-                "row": row,
-                "prediction": prediction,
-                "recommendation_result": recommendation_result,
-                "quiz_analysis": quiz_analysis,
-            }
-
+                st.session_state.prediction_result = {
+                    "model_name": model_name,
+                    "dataset_name": dataset_name,
+                    "student_row": student_row,
+                    "row": row,
+                    "prediction": prediction,
+                    "recommendation_result": recommendation_result,
+                    "quiz_analysis": quiz_analysis,
+                }
         except Exception as exc:
             st.session_state.prediction_result = None
-            st.error(f"Prediction failed: {exc}")
-            return
+            st.error(f"Automatic prediction failed: {exc}")
 
     render_app_header(df, st.session_state.prediction_result)
 
