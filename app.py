@@ -347,10 +347,24 @@ def run_student_evaluation_hub():
         cursor = conn.cursor()
         cursor.execute("SELECT timestamp_seconds FROM dropout_analysis WHERE video_id = ? AND is_critical_point = 1", (mod['id'],))
         critical_points = [row[0] for row in cursor.fetchall()]
+        
+        # Check if there's a recommended replacement video for this module
+        video_url = mod["url"]
+        cursor.execute("""
+            SELECT v.youtube_url, v.title FROM recommendations r
+            JOIN video_library v ON r.recommended_video_id = v.video_id
+            WHERE r.student_id = ? AND r.recommended_video_id = ? AND r.status = 'pending'
+            ORDER BY r.timestamp DESC LIMIT 1
+        """, (sess["student_id"], mod['id']))
+        rec_video = cursor.fetchone()
         conn.close()
+        
+        if rec_video:
+            video_url = rec_video[0]
+            st.info(f"📌 Playing recommended video: **{rec_video[1]}** (based on your previous performance)")
 
         # Streamlit Player
-        st_player(mod["url"], key=f"player_{mod['id']}")
+        st_player(video_url, key=f"player_{mod['id']}")
         
         # Track time based on real-world duration since entering module
         if "module_entry_time" not in sess:
@@ -588,7 +602,7 @@ def export_student_data_to_excel(sess):
     # Mock assignment score for model compatibility
     avg_assign_score = 100.0
     
-    total_time = sum(sess["module_times"].values())
+    total_time = sum(sess["module_times"].values()) / 60  # Convert minutes to hours for model
     
     # Feature Engineering for Prediction Model
     # Feature Engineering for Prediction Model
@@ -598,7 +612,7 @@ def export_student_data_to_excel(sess):
         int_id = 999999 # Fallback if they entered non-numeric
 
     # Learning Velocity (Modules per Hour)
-    velocity = len(sess["completed_modules"]) / (total_time / 60) if total_time > 0 else 0
+    velocity = len(sess["completed_modules"]) / total_time if total_time > 0 else 0
     
     data = {
         "student_id": [int_id],
