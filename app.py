@@ -1,4 +1,4 @@
-﻿import html
+import html
 import io
 import joblib
 import sqlite3
@@ -57,7 +57,7 @@ def inject_styles():
     with st.sidebar:
         st.markdown("""
         <div class='sidebar-logo'>
-            <div class='sidebar-logo-icon'>ðŸŽ“</div>
+            <div class='sidebar-logo-icon'>🎓</div>
             <div class='sidebar-logo-text'>EduGrowth</div>
             <div class='sidebar-logo-sub'>Intelligence Platform</div>
         </div>
@@ -69,7 +69,7 @@ def show_landing_page():
     """Display the initial selection screen for the two app modes."""
     st.markdown("""
     <div class='fade-in' style='text-align:center; padding: 6rem 0 4rem;'>
-        <div style='font-size:0.9rem; font-weight:800; color:var(--blue); text-transform:uppercase; letter-spacing:0.2em; margin-bottom:1.5rem;'>ðŸŽ“ EduGrowth Intelligence Platform</div>
+        <div style='font-size:0.9rem; font-weight:800; color:var(--blue); text-transform:uppercase; letter-spacing:0.2em; margin-bottom:1.5rem;'>🎓 EduGrowth Intelligence Platform</div>
         <h1 style='background:linear-gradient(135deg,#fff,#4f9eff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:1.2rem;'>Choose Your Intelligence Pathway</h1>
     </div>
     """, unsafe_allow_html=True)
@@ -80,12 +80,12 @@ def show_landing_page():
         st.markdown("""
         <div class='mode-card fade-in'>
             <div style='padding: 2rem 0;'>
-                <div style='font-size:4.5rem; margin-bottom:2rem;'>ðŸ“š</div>
+                <div style='font-size:4.5rem; margin-bottom:2rem;'>📚</div>
                 <h2 style='color:var(--blue); margin-bottom:0.5rem; font-size:2rem !important;'>Evaluation Hub</h2>
             </div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("ðŸš€  Launch Evaluation Hub", type="primary", width='stretch', key="enter_hub"):
+        if st.button("🚀  Launch Evaluation Hub", type="primary", width='stretch', key="enter_hub"):
             st.session_state.app_mode = "Option 1"
             st.rerun()
 
@@ -93,12 +93,12 @@ def show_landing_page():
         st.markdown("""
         <div class='mode-card fade-in'>
             <div style='padding: 2rem 0;'>
-                <div style='font-size:4.5rem; margin-bottom:2rem;'>ðŸ“‰</div>
+                <div style='font-size:4.5rem; margin-bottom:2rem;'>📉</div>
                 <h2 style='color:var(--green); margin-bottom:0.5rem; font-size:2rem !important;'>Analytics Matrix</h2>
             </div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("ðŸ“Š  Launch Analytics Matrix", type="primary", width='stretch', key="enter_dashboard"):
+        if st.button("📊  Launch Analytics Matrix", type="primary", width='stretch', key="enter_dashboard"):
             st.session_state.app_mode = "Option 2"
             if "option2_animation_shown" in st.session_state:
                 del st.session_state.option2_animation_shown
@@ -157,7 +157,7 @@ def run_student_evaluation_hub():
     sess = st.session_state.student_session
     
     # Context-aware Back button
-    if st.sidebar.button("â† Back"):
+    if st.sidebar.button("← Back"):
         if sess["current_step"] == "Quiz":
             sess["current_step"] = "Learning"
         elif sess["current_step"] == "Learning":
@@ -168,7 +168,7 @@ def run_student_evaluation_hub():
         
     if sess["student_id"]:
         st.sidebar.markdown("---")
-        if st.sidebar.button("ðŸ—‘ï¸ Reset Student Profile", help="Clear all progress and time tracking for this student."):
+        if st.sidebar.button("🗑️ Reset Student Profile", help="Clear all progress and time tracking for this student."):
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("UPDATE students SET time_spent = 0, modules_completed = 0, quiz_score = 0 WHERE student_id = ?", (sess["student_id"],))
@@ -186,17 +186,17 @@ def run_student_evaluation_hub():
     if sess["current_step"] == "Login":
         st.markdown("""
         <div class='login-card fade-in'>
-            <div style='font-size:4.5rem; margin-bottom:1.5rem;'>ðŸ‘¤</div>
+            <div style='font-size:4.5rem; margin-bottom:1.5rem;'>👤</div>
             <h2 style='margin-bottom:1rem;'>Student Evaluation Access</h2>
             <p style='color:var(--text-muted); font-size:0.9rem; margin-bottom:2rem;'>Enter your credentials to begin your learning journey</p>
             <div style='text-align:left;'>
         """, unsafe_allow_html=True)
         _, center, _ = st.columns([1, 2, 1])
         with center:
-            student_id_input = st.text_input("ðŸ†” Student ID", placeholder="e.g. 1001", key="student_login_id")
-            region_input = st.selectbox("ðŸŒ Region", ["Urban", "Rural", "Suburban"], key="student_region_input", help="Select your geographical region for better prediction accuracy.")
+            student_id_input = st.text_input("🆔 Student ID", placeholder="e.g. 1001", key="student_login_id")
+            region_input = st.selectbox("🌍 Region", ["Urban", "Rural", "Suburban"], key="student_region_input", help="Select your geographical region for better prediction accuracy.")
             st.markdown("<div style='margin-top:1.2rem;'></div>", unsafe_allow_html=True)
-            if st.button("Initialize Evaluation Sequence  â†’", type="primary", width='stretch'):
+            if st.button("Initialize Evaluation Sequence  →", type="primary", width='stretch'):
                 if student_id_input:
                     try:
                         # Try to fetch existing profile
@@ -276,22 +276,22 @@ def run_student_evaluation_hub():
                 st.markdown(f"""<div class='video-card' style='{border_style}'>
 <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;'>
 <div style='font-size:0.75rem; font-weight:800; color:var(--primary); text-transform:uppercase; letter-spacing:0.08em;'>Module {mod['id']}</div>
-{'<span style="font-size:0.7rem; font-weight:800; color:#00D4AA; background:rgba(0,212,170,0.12); padding:0.2rem 0.6rem; border-radius:999px; border:1px solid rgba(0,212,170,0.3);">â­ Recommended</span>' if is_recommended else ''}
+{'<span style="font-size:0.7rem; font-weight:800; color:#00D4AA; background:rgba(0,212,170,0.12); padding:0.2rem 0.6rem; border-radius:999px; border:1px solid rgba(0,212,170,0.3);">⭐ Recommended</span>' if is_recommended else ''}
 </div>
 <div style='font-size:1.1rem; font-weight:800; color:var(--text); margin-bottom:0.7rem;'>{mod['title']}</div>
-<span class='{'badge-done' if is_done else 'badge-pending'}'>{'âœ… Completed' if is_done else 'â³ Pending'}</span>
+<span class='{'badge-done' if is_done else 'badge-pending'}'>{'✅ Completed' if is_done else '⏳ Pending'}</span>
 {'&nbsp;&nbsp;<span style="color:var(--text-muted);font-size:0.85rem;">' + score_text + '</span>' if score_text else ''}
-<div style='margin-top:0.5rem; color:var(--text-muted); font-size:0.82rem;'>â± {mod['duration']}</div>
+<div style='margin-top:0.5rem; color:var(--text-muted); font-size:0.82rem;'>⏱ {mod['duration']}</div>
 </div>""", unsafe_allow_html=True)
                 
                 if is_recommended and is_done:
-                    btn_label = "ðŸ”„ Retake (Recommended)"
+                    btn_label = "🔄 Retake (Recommended)"
                 elif is_done:
-                    btn_label = "âœ… Review Module"
+                    btn_label = "✅ Review Module"
                 elif is_recommended:
-                    btn_label = f"â­ Start Recommended Module {mod['id']}"
+                    btn_label = f"⭐ Start Recommended Module {mod['id']}"
                 else:
-                    btn_label = f"â–¶  Start Module {mod['id']}"
+                    btn_label = f"▶  Start Module {mod['id']}"
                     
                 if st.button(btn_label, key=f"btn_mod_{mod['id']}", width='stretch'):
                     sess["active_module"] = mod
@@ -318,7 +318,7 @@ def run_student_evaluation_hub():
             if len(sess["completed_modules"]) == len(VIDEO_MODULES):
                 st.markdown("""
                 <div style='background:linear-gradient(135deg,rgba(61,214,140,0.08),rgba(79,158,255,0.08)); border:1px solid rgba(61,214,140,0.25); border-radius:14px; padding:2rem; text-align:center; margin-top:1.5rem;'>
-                    <div style='font-size:2rem; margin-bottom:0.5rem;'>ðŸŽ‰</div>
+                    <div style='font-size:2rem; margin-bottom:0.5rem;'>🎉</div>
                     <h3 style='color:#3dd68c; margin-bottom:0.4rem;'>All Modules Completed!</h3>
                     <p style='color:rgba(200,210,240,0.65); font-size:0.95rem;'>Your performance data is ready. Generate and download your evaluation report.</p>
                 </div>
@@ -327,7 +327,7 @@ def run_student_evaluation_hub():
             st.markdown("<div style='margin-top:1.5rem;'></div>", unsafe_allow_html=True)
             _, center, _ = st.columns([1, 2, 1])
             with center:
-                btn_label = "ðŸ“Š  Generate & Export Evaluation Excel" if len(sess["completed_modules"]) == len(VIDEO_MODULES) else "ðŸ“Š  Submit Evaluation Early"
+                btn_label = "📊  Generate & Export Evaluation Excel" if len(sess["completed_modules"]) == len(VIDEO_MODULES) else "📊  Submit Evaluation Early"
                 if st.button(btn_label, type="primary", width='stretch'):
                     export_student_data_to_excel(sess)
                     sess["current_step"] = "Finished"
@@ -364,10 +364,10 @@ def run_student_evaluation_hub():
             st.markdown(f"""
             <div style='background:rgba(0,212,170,0.08); border:1px solid #00D4AA; border-radius:10px;
                 padding:0.9rem 1.2rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.8rem;'>
-                <span style='font-size:1.4rem;'>ðŸ”</span>
+                <span style='font-size:1.4rem;'>🔁</span>
                 <div>
                     <div style='font-weight:800; color:#00D4AA; font-size:0.85rem;'>Recommended Video</div>
-                    <div style='color:var(--text-soft); font-size:0.9rem;'><strong>{rec_video[1]}</strong> â€” selected based on your previous performance in this module.</div>
+                    <div style='color:var(--text-soft); font-size:0.9rem;'><strong>{rec_video[1]}</strong> — selected based on your previous performance in this module.</div>
                 </div>
             </div>""", unsafe_allow_html=True)
 
@@ -410,7 +410,7 @@ def run_student_evaluation_hub():
                 # Update recommendation status
                 cursor.execute("UPDATE recommendations SET status = 'completed' WHERE rec_id = ?", (rec_id,))
                 conn.commit()
-                st.info("ðŸŒŸ You are following a personalized recommendation!")
+                st.info("🌟 You are following a personalized recommendation!")
             conn.close()
             sess["recs_checked"].append(mod['id'])
 
@@ -421,8 +421,8 @@ def run_student_evaluation_hub():
         for cp in critical_points:
             if current_time >= cp and cp not in sess["interrupted_points"]:
                 sess["interrupted_points"].append(cp)
-                st.warning(f"ðŸš€ Knowledge Check! You've reached a critical learning point at {cp}s.")
-                with st.expander("ðŸ“ Mid-Module Knowledge Check", expanded=True):
+                st.warning(f"🚀 Knowledge Check! You've reached a critical learning point at {cp}s.")
+                with st.expander("📝 Mid-Module Knowledge Check", expanded=True):
                     st.write("Quick question to ensure you're following along:")
                     q_text = f"Based on the concept discussed around {cp} seconds, what is the main takeaway?"
                     st.text_input(q_text, key=f"kc_{mod['id']}_{cp}")
@@ -430,11 +430,11 @@ def run_student_evaluation_hub():
                         st.success("Great! Keep watching.")
                 break
 
-        with st.expander("ðŸ“„  View Video Transcript"):
+        with st.expander("📄  View Video Transcript"):
             st.markdown(f"<p style='color:rgba(220,228,255,0.85); line-height:1.8; font-size:0.95rem;'>{mod['transcript']}</p>", unsafe_allow_html=True)
 
         st.markdown("<div class='quiz-container'>", unsafe_allow_html=True)
-        st.markdown("<h3 style='margin-bottom:0.3rem;'>ðŸ“ Comprehensive Final Quiz</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin-bottom:0.3rem;'>📝 Comprehensive Final Quiz</h3>", unsafe_allow_html=True)
         st.markdown(f"<p style='color:rgba(200,210,240,0.65); font-size:0.9rem; margin-bottom:1.5rem;'>Answer all 15 questions based on the video content above.</p>", unsafe_allow_html=True)
 
         if "user_answers_cache" not in sess:
@@ -460,7 +460,7 @@ def run_student_evaluation_hub():
             st.markdown("<hr style='border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.8rem 0;'>", unsafe_allow_html=True)
 
         # Feedback Section
-        st.markdown("<h3 style='margin-top:2rem;'>ðŸ’¬ Module Feedback</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='margin-top:2rem;'>💬 Module Feedback</h3>", unsafe_allow_html=True)
         feedback_text = st.text_area(
             "How was your learning experience?",
             placeholder="Share your thoughts about this module, video, or learning experience...",
@@ -468,7 +468,7 @@ def run_student_evaluation_hub():
             key=f"feedback_{mod['id']}"
         )
 
-        if st.button("âœ…  Submit Quiz & Feedback", type="primary", width='stretch'):
+        if st.button("✅  Submit Quiz & Feedback", type="primary", width='stretch'):
             if any(ans is None for ans in user_answers.values()):
                 st.error("Please answer all 15 questions before submitting.")
             else:
@@ -523,9 +523,9 @@ def run_student_evaluation_hub():
                 
                 sess["current_step"] = "Learning"
                 pct = int((score / 15) * 100)
-                st.success(f"ðŸŽ‰ Module complete! You scored **{score}/15** ({pct}%)")
+                st.success(f"🎉 Module complete! You scored **{score}/15** ({pct}%)")
                 if recs:
-                    st.info(f"ðŸ’¡ New recommendation generated: {recs[0]['text']}")
+                    st.info(f"💡 New recommendation generated: {recs[0]['text']}")
                 st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -533,7 +533,7 @@ def run_student_evaluation_hub():
         st.balloons()
         st.markdown(f"""
         <div class='fade-in' style='text-align:center; padding:2rem 0;'>
-            <div style='font-size:4.5rem; margin-bottom:1rem;'>ðŸ“œ</div>
+            <div style='font-size:4.5rem; margin-bottom:1rem;'>📜</div>
             <h2 style='margin-bottom:1rem;'>Assessment Certified</h2>
         </div>
         """, unsafe_allow_html=True)
@@ -546,12 +546,12 @@ def run_student_evaluation_hub():
             st.markdown("<h4 style='text-align:center; margin-top:2rem; color:var(--text-soft);'>Access predictive insights?</h4>", unsafe_allow_html=True)
             
             col_a, col_b = st.columns(2)
-            if col_a.button("ðŸ“Š Yes, Analytics Hub", type="primary", width='stretch'):
+            if col_a.button("📊 Yes, Analytics Hub", type="primary", width='stretch'):
                 st.session_state.last_eval_student_id = sess["student_id"]
                 st.session_state.app_mode = "Option 2"
                 st.rerun()
                 
-            if col_b.button("ðŸ  No, Logout", width='stretch'):
+            if col_b.button("🏠 No, Logout", width='stretch'):
                 # Completely reset student session on logout
                 st.session_state.student_session = {
                     "student_id": None,
@@ -597,7 +597,7 @@ def render_official_report_card(sess):
                 <td style='padding:1rem 0; text-align:right; font-weight:800; color:{color};'>{level}</td>
             </tr>
         </table>
-        <div style='text-align:center; font-size:0.8rem; color:var(--text-muted);'>Issued by EduGrowth AI Engine â€¢ {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}</div>
+        <div style='text-align:center; font-size:0.8rem; color:var(--text-muted);'>Issued by EduGrowth AI Engine • {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -655,7 +655,7 @@ def export_student_data_to_excel(sess):
         pd.DataFrame(details).to_excel(writer, index=False, sheet_name='Module_Details')
     
     st.download_button(
-        label="ðŸ“¥ Download Performance Report (.xlsx)",
+        label="📥 Download Performance Report (.xlsx)",
         data=output.getvalue(),
         file_name=f"Student_{int_id}_Report.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -846,7 +846,7 @@ def load_active_dataset(papaparse_data=None, source="Live"):
     
     if papaparse_data:
         df = pd.DataFrame(papaparse_data)
-        return df, "ðŸ“‚ Uploaded Dataset", "uploaded"
+        return df, "📂 Uploaded Dataset", "uploaded"
     
     # Otherwise, fetch from selected DB
     db_file = PRESCRIPTIVE_DB if source == "Prescriptive" else "edugrowth.db"
@@ -854,7 +854,7 @@ def load_active_dataset(papaparse_data=None, source="Live"):
     df = pd.read_sql("SELECT * FROM students", conn)
     conn.close()
     
-    label = "ðŸ“¡ Live Operational Data" if source == "Live" else "ðŸŽ¯ Prescriptive (Impact View)"
+    label = "📡 Live Operational Data" if source == "Live" else "🎯 Prescriptive (Impact View)"
     return df, label, source.lower()
 
 
@@ -1287,7 +1287,7 @@ def show_quiz_analysis(row, quiz_analysis):
     if constraint:
         st.markdown(f"""
         <div style='background:rgba(61,214,140,0.1); border:1px solid rgba(61,214,140,0.3); border-radius:10px; padding:1.2rem; margin:1rem 0;'>
-            <div style='color:#3dd68c; font-weight:800; font-size:0.8rem; text-transform:uppercase; margin-bottom:0.5rem;'>ðŸŽ¯ Prescriptive Goal (Recommendation Impact)</div>
+            <div style='color:#3dd68c; font-weight:800; font-size:0.8rem; text-transform:uppercase; margin-bottom:0.5rem;'>🎯 Prescriptive Goal (Recommendation Impact)</div>
             <div style='display:grid; grid-template-columns: repeat(3, 1fr); gap:1rem;'>
                 <div><small>Target Quiz</small><br><strong>{constraint[2]}%</strong></div>
                 <div><small>Engagement Boost</small><br><strong>+{constraint[3]}%</strong></div>
@@ -1357,7 +1357,7 @@ def show_charts(df, row):
     """Display interactive charts for the selected student and overall dataset."""
     st.subheader("Interactive Analytics")
     st.markdown(
-        '<div class="section-kicker">Filter the cohort, compare the selected learner to peers, and inspect distribution patterns. ðŸ’¡ <i>Tip: Percentiles show where you stand relative to the current group.</i></div>',
+        '<div class="section-kicker">Filter the cohort, compare the selected learner to peers, and inspect distribution patterns. 💡 <i>Tip: Percentiles show where you stand relative to the current group.</i></div>',
         unsafe_allow_html=True,
     )
 
@@ -1754,7 +1754,7 @@ def render_roadmap(actions):
     """Render a visual 4-week roadmap for the student."""
     st.subheader("4-Week Improvement Roadmap")
     cols = st.columns(4)
-    icons = ["ðŸŒ±", "ðŸŒ¿", "ðŸŒ³", "ðŸ†"]
+    icons = ["🌱", "🌿", "🌳", "🏆"]
     titles = ["Foundation", "Momentum", "Optimization", "Mastery"]
     
     for i in range(4):
@@ -2162,7 +2162,7 @@ def show_watchlist(df):
 def main():
     st.set_page_config(
         page_title="EduGrowth: Learning & Prediction",
-        page_icon="ðŸŽ“",
+        page_icon="🎓",
         layout="wide",
     )
     inject_styles()
@@ -2198,7 +2198,7 @@ def main():
         st.stop()
 
     with st.sidebar:
-        if st.button("â† Back to Learning Hub"):
+        if st.button("← Back to Learning Hub"):
             st.session_state.app_mode = "Landing"
             st.rerun()
         st.markdown("---")
@@ -2304,7 +2304,7 @@ def main():
     render_app_header(df, st.session_state.prediction_result)
 
     if student_not_found:
-        st.warning(f"âš ï¸ No student found with ID **{int(student_id)}** in the current dataset. Please verify the ID or upload a new dataset.")
+        st.warning(f"⚠️ No student found with ID **{int(student_id)}** in the current dataset. Please verify the ID or upload a new dataset.")
 
     if st.session_state.prediction_result is None:
         show_landing_dashboard(df)
@@ -2329,7 +2329,7 @@ def show_sentiment_dashboard(student_id):
         st.info("No feedback data available for this student yet. Complete a module and leave feedback to see analysis.")
         return
 
-    # â”€â”€ Alert: modules with >50% negative feedback â”€â”€
+    # ── Alert: modules with >50% negative feedback ──
     if not df_all_feedback.empty:
         neg_by_module = df_all_feedback.groupby('module_id').apply(
             lambda g: (g['sentiment_label'] == 'Negative').sum() / len(g)
@@ -2339,13 +2339,13 @@ def show_sentiment_dashboard(student_id):
             st.markdown(f"""
             <div style='background:rgba(255,77,106,0.1); border:1px solid #FF4D6A; border-radius:10px;
                 padding:1rem; margin-bottom:1.5rem;'>
-                âš ï¸ <strong>Alert:</strong> Module(s) <strong>{flagged}</strong> have over 50% negative feedback
+                ⚠️ <strong>Alert:</strong> Module(s) <strong>{flagged}</strong> have over 50% negative feedback
                 and may need content review.
             </div>""", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("ðŸ“Š Sentiment Distribution")
+        st.subheader("📊 Sentiment Distribution")
         sentiment_counts = df_all_feedback['sentiment_label'].value_counts().reset_index()
         sentiment_counts.columns = ['Sentiment', 'Count']
         chart = alt.Chart(sentiment_counts).mark_arc(innerRadius=50).encode(
@@ -2357,7 +2357,7 @@ def show_sentiment_dashboard(student_id):
         st.altair_chart(chart, width='stretch')
 
     with col2:
-        st.subheader("ðŸ“ˆ Sentiment Trend Over Time")
+        st.subheader("📈 Sentiment Trend Over Time")
         df_feedback['timestamp'] = pd.to_datetime(df_feedback['timestamp'])
         chart = alt.Chart(df_feedback).mark_line(point=True, color='#2E5CFF').encode(
             x=alt.X('timestamp:T', title='Date'),
@@ -2366,8 +2366,8 @@ def show_sentiment_dashboard(student_id):
         ).properties(height=280)
         st.altair_chart(chart, width='stretch')
 
-    # â”€â”€ Module-wise sentiment bar chart â”€â”€
-    st.subheader("ðŸ“¦ Module-wise Sentiment Breakdown")
+    # ── Module-wise sentiment bar chart ──
+    st.subheader("📦 Module-wise Sentiment Breakdown")
     if 'module_id' in df_all_feedback.columns:
         mod_sent = df_all_feedback.groupby('module_id')['sentiment_score'].mean().reset_index()
         mod_sent.columns = ['Module', 'Avg Sentiment']
@@ -2383,8 +2383,8 @@ def show_sentiment_dashboard(student_id):
         ).properties(height=250)
         st.altair_chart(chart, width='stretch')
 
-    # â”€â”€ Keyword tag cloud (plain HTML, no dependency) â”€â”€
-    st.subheader("ðŸ·ï¸ Top Keywords in Feedback")
+    # ── Keyword tag cloud (plain HTML, no dependency) ──
+    st.subheader("🏷️ Top Keywords in Feedback")
     import re
     from collections import Counter
     stopwords = {'the','a','an','is','it','in','and','or','but','for','on','at','to',
@@ -2403,17 +2403,17 @@ def show_sentiment_dashboard(student_id):
         ])
         st.markdown(f"<div style='line-height:2.5;'>{tags_html}</div>", unsafe_allow_html=True)
 
-    # â”€â”€ Recent feedback stream â”€â”€
-    st.subheader("ðŸ• Recent Feedback Stream")
+    # ── Recent feedback stream ──
+    st.subheader("🕐 Recent Feedback Stream")
     for _, row in df_feedback.tail(8).iterrows():
         color = "#00D4AA" if row['sentiment_label'] == "Positive" else "#FFB020" if row['sentiment_label'] == "Neutral" else "#FF4D6A"
         st.markdown(f"""
         <div style='border-left:4px solid {color}; background:var(--card-bg); padding:0.9rem 1.2rem;
              margin-bottom:0.8rem; border-radius:0 10px 10px 0;'>
             <div style='font-size:0.75rem; color:var(--text-muted); margin-bottom:0.3rem;'>
-                Module {row.get('module_id','?')} &nbsp;Â·&nbsp; {row['timestamp']}
+                Module {row.get('module_id','?')} &nbsp;·&nbsp; {row['timestamp']}
             </div>
-            <div style='color:var(--text-soft); margin-bottom:0.3rem;'>{row['feedback_text'] or 'â€”'}</div>
+            <div style='color:var(--text-soft); margin-bottom:0.3rem;'>{row['feedback_text'] or '—'}</div>
             <span style='font-weight:800; color:{color}; font-size:0.72rem; text-transform:uppercase;
                 background:{color}22; padding:0.2rem 0.6rem; border-radius:999px;'>
                 {row['sentiment_label']} ({float(row['sentiment_score']):.2f})
@@ -2422,7 +2422,7 @@ def show_sentiment_dashboard(student_id):
 
 def show_recommendations_accuracy(student_id):
     """Measure effectiveness of recommendations with Before/After stats and t-test."""
-    st.subheader("ðŸ“Š Recommendations Effectiveness")
+    st.subheader("📊 Recommendations Effectiveness")
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -2454,12 +2454,12 @@ def show_recommendations_accuracy(student_id):
     c3.metric("Rec Completion Rate", f"{completion_rate:.1f}%")
 
     # Before vs After table
-    st.subheader("ðŸ“‹ Before vs. After Comparison")
+    st.subheader("📋 Before vs. After Comparison")
     comparison = pd.DataFrame({
         "Metric": ["Avg Quiz Score", "Completion Rate"],
-        "Before Recommendations": [f"{avg_pre:.1f}" if not df_logs.empty else "N/A", "â€”"],
+        "Before Recommendations": [f"{avg_pre:.1f}" if not df_logs.empty else "N/A", "—"],
         "After Recommendations": [f"{avg_post:.1f}" if not df_logs.empty else "N/A", f"{completion_rate:.1f}%"],
-        "Improvement": [f"+{avg_improvement:.1f}" if avg_improvement > 0 else "N/A", "â€”"]
+        "Improvement": [f"+{avg_improvement:.1f}" if avg_improvement > 0 else "N/A", "—"]
     })
     st.dataframe(comparison, width='stretch', hide_index=True)
 
@@ -2475,14 +2475,14 @@ def show_recommendations_accuracy(student_id):
             diff = [p - r for p, r in zip(post[:min_len], pre[:min_len])]
             import statistics
             d = (sum(diff)/len(diff)) / (statistics.stdev(diff) if len(diff) > 1 else 1)
-            sig = "âœ… Significant" if p_val < 0.05 else "âšª Not yet significant"
-            st.subheader("ðŸ”¬ Statistical Analysis")
+            sig = "✅ Significant" if p_val < 0.05 else "⚪ Not yet significant"
+            st.subheader("🔬 Statistical Analysis")
             sc1, sc2, sc3 = st.columns(3)
             sc1.metric("t-statistic", f"{t_stat:.3f}")
             sc2.metric("p-value", f"{p_val:.3f}")
             sc3.metric("Effect Size (Cohen's d)", f"{d:.3f}")
             effect_label = "Large" if abs(d) > 0.8 else "Medium" if abs(d) > 0.5 else "Small"
-            st.markdown(f"**Result:** {sig} &nbsp;Â·&nbsp; Effect size: **{effect_label}** (d={d:.2f})")
+            st.markdown(f"**Result:** {sig} &nbsp;·&nbsp; Effect size: **{effect_label}** (d={d:.2f})")
 
         # Per-recommendation improvement bar chart
         df_logs['Improvement'] = df_logs['post_score'] - df_logs['pre_score']
@@ -2498,14 +2498,14 @@ def show_recommendations_accuracy(student_id):
         st.info("Complete at least one recommended module to see statistical analysis.")
 
     if not df_recs.empty:
-        st.subheader("ðŸ“ Individual Recommendation Log")
+        st.subheader("📝 Individual Recommendation Log")
         st.dataframe(df_recs, width='stretch', hide_index=True)
     else:
         st.info("No personalized recommendations tracked for this student yet.")
 
 def show_adaptivity_monitoring(student_id):
     """Statistical impact of personalized learning pathways with KPIs and scatter plot."""
-    st.subheader("ðŸŽ¯ Adaptivity Impact Analysis")
+    st.subheader("🎯 Adaptivity Impact Analysis")
 
     conn = get_connection()
     df_logs = pd.read_sql("SELECT * FROM adaptivity_log WHERE student_id = ?", conn, params=(student_id,))
@@ -2566,7 +2566,7 @@ def show_adaptivity_monitoring(student_id):
 
     # Time-series effectiveness
     if 'timestamp' in df_logs.columns and not with_scores.empty:
-        st.subheader("ðŸ“ˆ Rolling Improvement Over Time")
+        st.subheader("📈 Rolling Improvement Over Time")
         ts_df = with_scores.copy()
         ts_df['timestamp'] = pd.to_datetime(ts_df['timestamp'])
         ts_df['improvement'] = ts_df['post_score'] - ts_df['pre_score']
@@ -2605,7 +2605,7 @@ def show_video_engagement(student_id):
 def main():
     st.set_page_config(
         page_title="EduGrowth: Learning & Prediction",
-        page_icon="ðŸŽ“",
+        page_icon="🎓",
         layout="wide",
     )
     inject_styles()
@@ -2641,7 +2641,7 @@ def main():
         st.stop()
 
     with st.sidebar:
-        if st.button("â† Back to Learning Hub"):
+        if st.button("← Back to Learning Hub"):
             st.session_state.app_mode = "Landing"
             st.rerun()
         st.markdown("---")
@@ -2752,7 +2752,7 @@ def main():
     render_app_header(df, st.session_state.prediction_result)
 
     if student_not_found:
-        st.warning(f"âš ï¸ No student found with ID **{int(student_id)}** in the current dataset. Please verify the ID or upload a new dataset.")
+        st.warning(f"⚠️ No student found with ID **{int(student_id)}** in the current dataset. Please verify the ID or upload a new dataset.")
 
     if st.session_state.prediction_result is None:
         show_landing_dashboard(df)
@@ -2824,4 +2824,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
