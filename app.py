@@ -249,23 +249,69 @@ def run_student_evaluation_hub():
         </div>
         """, unsafe_allow_html=True)
 
+        # Fetch pending recommendations to highlight modules
+        recommended_module_ids = set()
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT recommended_video_id FROM recommendations 
+                WHERE student_id = ? AND status = 'pending'
+            """, (int(sess["student_id"]),))
+            recommended_module_ids = {row[0] for row in cursor.fetchall()}
+            conn.close()
+        except:
+            pass
+
         cols = st.columns(2)
         for i, mod in enumerate(VIDEO_MODULES):
             is_done = mod["id"] in sess["completed_modules"]
+            is_recommended = mod["id"] in recommended_module_ids
             score_text = f"Score: {sess['scores'].get(mod['id'], '-')}/15" if is_done else ""
+            
+            # Determine card border style
+            border_style = "border-color:#00D4AA; box-shadow:0 0 15px rgba(0,212,170,0.15);" if is_recommended else ""
+            
             with cols[i % 2]:
-                st.markdown(f"""<div class='video-card'>
-<div style='font-size:0.75rem; font-weight:800; color:#4f9eff; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.4rem;'>Module {mod['id']}</div>
-<div style='font-size:1.1rem; font-weight:800; color:#f0f4ff; margin-bottom:0.7rem;'>{mod['title']}</div>
+                st.markdown(f"""<div class='video-card' style='{border_style}'>
+<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;'>
+<div style='font-size:0.75rem; font-weight:800; color:var(--primary); text-transform:uppercase; letter-spacing:0.08em;'>Module {mod['id']}</div>
+{'<span style="font-size:0.7rem; font-weight:800; color:#00D4AA; background:rgba(0,212,170,0.12); padding:0.2rem 0.6rem; border-radius:999px; border:1px solid rgba(0,212,170,0.3);">⭐ Recommended</span>' if is_recommended else ''}
+</div>
+<div style='font-size:1.1rem; font-weight:800; color:var(--text); margin-bottom:0.7rem;'>{mod['title']}</div>
 <span class='{'badge-done' if is_done else 'badge-pending'}'>{'✅ Completed' if is_done else '⏳ Pending'}</span>
-{'&nbsp;&nbsp;<span style="color:rgba(200,210,240,0.6);font-size:0.85rem;">' + score_text + '</span>' if score_text else ''}
-<div style='margin-top:0.5rem; color:rgba(200,210,240,0.5); font-size:0.82rem;'>⏱ {mod['duration']}</div>
+{'&nbsp;&nbsp;<span style="color:var(--text-muted);font-size:0.85rem;">' + score_text + '</span>' if score_text else ''}
+<div style='margin-top:0.5rem; color:var(--text-muted); font-size:0.82rem;'>⏱ {mod['duration']}</div>
 </div>""", unsafe_allow_html=True)
-                btn_label = "✅ Review Module" if is_done else f"▶  Start Module {mod['id']}"
+                
+                if is_recommended and is_done:
+                    btn_label = "🔄 Retake (Recommended)"
+                elif is_done:
+                    btn_label = "✅ Review Module"
+                elif is_recommended:
+                    btn_label = f"⭐ Start Recommended Module {mod['id']}"
+                else:
+                    btn_label = f"▶  Start Module {mod['id']}"
+                    
                 if st.button(btn_label, key=f"btn_mod_{mod['id']}", use_container_width=True):
                     sess["active_module"] = mod
                     sess["module_start_time"] = pd.Timestamp.now()
                     sess["current_step"] = "Quiz"
+                    
+                    # Mark recommendation as started
+                    if is_recommended:
+                        try:
+                            conn = get_connection()
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                UPDATE recommendations SET status = 'completed' 
+                                WHERE student_id = ? AND recommended_video_id = ? AND status = 'pending'
+                            """, (int(sess["student_id"]), mod["id"]))
+                            conn.commit()
+                            conn.close()
+                        except:
+                            pass
+                    
                     st.rerun()
 
         if len(sess["completed_modules"]) > 0:
