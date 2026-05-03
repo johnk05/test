@@ -2316,84 +2316,189 @@ def show_sentiment_dashboard(student_id):
     df_feedback = pd.read_sql("SELECT * FROM feedback WHERE student_id = ?", conn, params=(student_id,))
     df_all_feedback = pd.read_sql("SELECT * FROM feedback", conn)
     conn.close()
-    
+
     if df_feedback.empty:
-        st.info("No feedback data available for this student yet.")
+        st.info("No feedback data available for this student yet. Complete a module and leave feedback to see analysis.")
         return
+
+    # ── Alert: modules with >50% negative feedback ──
+    if not df_all_feedback.empty:
+        neg_by_module = df_all_feedback.groupby('module_id').apply(
+            lambda g: (g['sentiment_label'] == 'Negative').sum() / len(g)
+        )
+        flagged = neg_by_module[neg_by_module > 0.5].index.tolist()
+        if flagged:
+            st.markdown(f"""
+            <div style='background:rgba(255,77,106,0.1); border:1px solid #FF4D6A; border-radius:10px;
+                padding:1rem; margin-bottom:1.5rem;'>
+                ⚠️ <strong>Alert:</strong> Module(s) <strong>{flagged}</strong> have over 50% negative feedback
+                and may need content review.
+            </div>""", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Sentiment Distribution")
+        st.subheader("📊 Sentiment Distribution")
         sentiment_counts = df_all_feedback['sentiment_label'].value_counts().reset_index()
         sentiment_counts.columns = ['Sentiment', 'Count']
-        chart = alt.Chart(sentiment_counts).mark_arc().encode(
+        chart = alt.Chart(sentiment_counts).mark_arc(innerRadius=50).encode(
             theta=alt.Theta(field="Count", type="quantitative"),
-            color=alt.Color(field="Sentiment", type="nominal", scale=alt.Scale(domain=['Positive', 'Neutral', 'Negative'], range=['#3dd68c', '#f5c542', '#ff6b6b'])),
-            tooltip=['Sentiment', 'Count']
-        ).properties(height=300)
+            color=alt.Color(field="Sentiment", type="nominal",
+                scale=alt.Scale(domain=['Positive','Neutral','Negative'], range=['#00D4AA','#FFB020','#FF4D6A'])),
+            tooltip=['Sentiment','Count']
+        ).properties(height=280)
         st.altair_chart(chart, use_container_width=True)
 
     with col2:
-        st.subheader("Sentiment Trend")
+        st.subheader("📈 Sentiment Trend Over Time")
         df_feedback['timestamp'] = pd.to_datetime(df_feedback['timestamp'])
-        chart = alt.Chart(df_feedback).mark_line(point=True).encode(
-            x='timestamp:T',
-            y=alt.Y('sentiment_score:Q', scale=alt.Scale(domain=[-1, 1])),
-            tooltip=['timestamp', 'sentiment_score', 'feedback_text']
-        ).properties(height=300)
+        chart = alt.Chart(df_feedback).mark_line(point=True, color='#2E5CFF').encode(
+            x=alt.X('timestamp:T', title='Date'),
+            y=alt.Y('sentiment_score:Q', scale=alt.Scale(domain=[-1,1]), title='Sentiment Score'),
+            tooltip=['timestamp:T','sentiment_score:Q','feedback_text:N']
+        ).properties(height=280)
         st.altair_chart(chart, use_container_width=True)
 
-    st.subheader("Recent Feedback Stream")
-    for _, row in df_feedback.tail(5).iterrows():
-        color = "#3dd68c" if row['sentiment_label'] == "Positive" else "#f5c542" if row['sentiment_label'] == "Neutral" else "#ff6b6b"
+    # ── Module-wise sentiment bar chart ──
+    st.subheader("📦 Module-wise Sentiment Breakdown")
+    if 'module_id' in df_all_feedback.columns:
+        mod_sent = df_all_feedback.groupby('module_id')['sentiment_score'].mean().reset_index()
+        mod_sent.columns = ['Module', 'Avg Sentiment']
+        mod_sent['Module'] = 'Module ' + mod_sent['Module'].astype(str)
+        chart = alt.Chart(mod_sent).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+            x=alt.X('Module:N', title='Module'),
+            y=alt.Y('Avg Sentiment:Q', scale=alt.Scale(domain=[-1,1])),
+            color=alt.condition(
+                alt.datum['Avg Sentiment'] > 0,
+                alt.value('#00D4AA'), alt.value('#FF4D6A')
+            ),
+            tooltip=['Module','Avg Sentiment']
+        ).properties(height=250)
+        st.altair_chart(chart, use_container_width=True)
+
+    # ── Keyword tag cloud (plain HTML, no dependency) ──
+    st.subheader("🏷️ Top Keywords in Feedback")
+    import re
+    from collections import Counter
+    stopwords = {'the','a','an','is','it','in','and','or','but','for','on','at','to',
+                 'of','i','this','was','my','me','very','so','that','with','we','be'}
+    all_text = ' '.join(df_feedback['feedback_text'].dropna().tolist()).lower()
+    words = [w for w in re.findall(r'\b[a-z]{3,}\b', all_text) if w not in stopwords]
+    top_words = Counter(words).most_common(20)
+    if top_words:
+        max_count = top_words[0][1] if top_words else 1
+        tags_html = "".join([
+            f"<span style='display:inline-block; margin:4px; padding:5px 12px; border-radius:999px; "
+            f"font-size:{0.75 + (cnt/max_count)*0.5:.2f}rem; font-weight:700; "
+            f"background:rgba(46,92,255,{0.1 + (cnt/max_count)*0.25:.2f}); "
+            f"color:var(--text); border:1px solid rgba(46,92,255,0.3);'>{w}</span>"
+            for w, cnt in top_words
+        ])
+        st.markdown(f"<div style='line-height:2.5;'>{tags_html}</div>", unsafe_allow_html=True)
+
+    # ── Recent feedback stream ──
+    st.subheader("🕐 Recent Feedback Stream")
+    for _, row in df_feedback.tail(8).iterrows():
+        color = "#00D4AA" if row['sentiment_label'] == "Positive" else "#FFB020" if row['sentiment_label'] == "Neutral" else "#FF4D6A"
         st.markdown(f"""
-        <div style='border-left: 5px solid {color}; background: var(--surface); padding: 1rem; margin-bottom: 1rem; border-radius: 0 10px 10px 0;'>
-            <div style='font-size: 0.8rem; color: var(--text-muted);'>{row['timestamp']}</div>
-            <div style='color: var(--text-soft);'>{row['feedback_text']}</div>
-            <div style='font-weight: 800; color: {color}; font-size: 0.75rem; text-transform: uppercase;'>{row['sentiment_label']} ({row['sentiment_score']})</div>
-        </div>
-        """, unsafe_allow_html=True)
+        <div style='border-left:4px solid {color}; background:var(--card-bg); padding:0.9rem 1.2rem;
+             margin-bottom:0.8rem; border-radius:0 10px 10px 0;'>
+            <div style='font-size:0.75rem; color:var(--text-muted); margin-bottom:0.3rem;'>
+                Module {row.get('module_id','?')} &nbsp;·&nbsp; {row['timestamp']}
+            </div>
+            <div style='color:var(--text-soft); margin-bottom:0.3rem;'>{row['feedback_text'] or '—'}</div>
+            <span style='font-weight:800; color:{color}; font-size:0.72rem; text-transform:uppercase;
+                background:{color}22; padding:0.2rem 0.6rem; border-radius:999px;'>
+                {row['sentiment_label']} ({float(row['sentiment_score']):.2f})
+            </span>
+        </div>""", unsafe_allow_html=True)
 
 def show_recommendations_accuracy(student_id):
-    """Measure effectiveness of recommendations based on actual student behavior."""
-    st.subheader("Recommendations Effectiveness")
-    
+    """Measure effectiveness of recommendations with Before/After stats and t-test."""
+    st.subheader("📊 Recommendations Effectiveness")
+
     conn = get_connection()
-    # Fetch real improvements from adaptivity_log
-    # For simplicity, we compare the score of the module where rec was generated vs the next one
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT AVG(post_score - pre_score) FROM adaptivity_log 
-        WHERE student_id = ? AND action_taken = 'started_recommended_video' AND post_score IS NOT NULL
-    """, (student_id,))
-    avg_improvement = cursor.fetchone()[0] or 0
-    
-    # Track completion of recommended videos
+
+    # Completion rate
     cursor.execute("SELECT COUNT(*) FROM recommendations WHERE student_id = ? AND status = 'completed'", (student_id,))
     completed_recs = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(*) FROM recommendations WHERE student_id = ?", (student_id,))
     total_recs = cursor.fetchone()[0]
     completion_rate = (completed_recs / total_recs * 100) if total_recs > 0 else 0
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Avg. Improvement (Points)", f"{avg_improvement:.2f}")
-    with col2:
-        st.metric("Recommendation Completion Rate", f"{completion_rate:.1f}%")
-
+    # Pre/post scores from adaptivity_log
+    df_logs = pd.read_sql("""
+        SELECT pre_score, post_score, action_taken FROM adaptivity_log
+        WHERE student_id = ? AND pre_score IS NOT NULL AND post_score IS NOT NULL
+    """, conn, params=(student_id,))
     df_recs = pd.read_sql("SELECT timestamp, recommendation_text, status FROM recommendations WHERE student_id = ?", conn, params=(student_id,))
     conn.close()
-    
+
+    avg_improvement = (df_logs['post_score'] - df_logs['pre_score']).mean() if not df_logs.empty else 0
+    avg_pre = df_logs['pre_score'].mean() if not df_logs.empty else 0
+    avg_post = df_logs['post_score'].mean() if not df_logs.empty else 0
+
+    # KPI cards
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Avg. Score Before", f"{avg_pre:.1f}" if not df_logs.empty else "N/A")
+    c2.metric("Avg. Score After", f"{avg_post:.1f}" if not df_logs.empty else "N/A",
+              delta=f"+{avg_improvement:.1f}" if avg_improvement > 0 else f"{avg_improvement:.1f}")
+    c3.metric("Rec Completion Rate", f"{completion_rate:.1f}%")
+
+    # Before vs After table
+    st.subheader("📋 Before vs. After Comparison")
+    comparison = pd.DataFrame({
+        "Metric": ["Avg Quiz Score", "Completion Rate"],
+        "Before Recommendations": [f"{avg_pre:.1f}" if not df_logs.empty else "N/A", "—"],
+        "After Recommendations": [f"{avg_post:.1f}" if not df_logs.empty else "N/A", f"{completion_rate:.1f}%"],
+        "Improvement": [f"+{avg_improvement:.1f}" if avg_improvement > 0 else "N/A", "—"]
+    })
+    st.dataframe(comparison, use_container_width=True, hide_index=True)
+
+    # Statistical significance
+    if not df_logs.empty and len(df_logs) >= 2:
+        from scipy import stats
+        pre = df_logs['pre_score'].dropna().tolist()
+        post = df_logs['post_score'].dropna().tolist()
+        min_len = min(len(pre), len(post))
+        if min_len >= 2:
+            t_stat, p_val = stats.ttest_rel(post[:min_len], pre[:min_len])
+            # Cohen's d
+            diff = [p - r for p, r in zip(post[:min_len], pre[:min_len])]
+            import statistics
+            d = (sum(diff)/len(diff)) / (statistics.stdev(diff) if len(diff) > 1 else 1)
+            sig = "✅ Significant" if p_val < 0.05 else "⚪ Not yet significant"
+            st.subheader("🔬 Statistical Analysis")
+            sc1, sc2, sc3 = st.columns(3)
+            sc1.metric("t-statistic", f"{t_stat:.3f}")
+            sc2.metric("p-value", f"{p_val:.3f}")
+            sc3.metric("Effect Size (Cohen's d)", f"{d:.3f}")
+            effect_label = "Large" if abs(d) > 0.8 else "Medium" if abs(d) > 0.5 else "Small"
+            st.markdown(f"**Result:** {sig} &nbsp;·&nbsp; Effect size: **{effect_label}** (d={d:.2f})")
+
+        # Per-recommendation improvement bar chart
+        df_logs['Improvement'] = df_logs['post_score'] - df_logs['pre_score']
+        df_logs['Entry'] = [f"Rec {i+1}" for i in range(len(df_logs))]
+        chart = alt.Chart(df_logs).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+            x=alt.X('Entry:N', title='Recommendation'),
+            y=alt.Y('Improvement:Q', title='Score Improvement'),
+            color=alt.condition(alt.datum.Improvement > 0, alt.value('#00D4AA'), alt.value('#FF4D6A')),
+            tooltip=['Entry','pre_score','post_score','Improvement']
+        ).properties(height=250, title='Per-Recommendation Score Change')
+        st.altair_chart(chart, use_container_width=True)
+    else:
+        st.info("Complete at least one recommended module to see statistical analysis.")
+
     if not df_recs.empty:
-        st.subheader("Individual Recommendation Tracking")
-        st.dataframe(df_recs, use_container_width=True)
+        st.subheader("📝 Individual Recommendation Log")
+        st.dataframe(df_recs, use_container_width=True, hide_index=True)
     else:
         st.info("No personalized recommendations tracked for this student yet.")
 
 def show_adaptivity_monitoring(student_id):
-    """Statistical impact of personalized learning pathways using real student data."""
-    st.subheader("Adaptivity Impact Analysis")
-    
+    """Statistical impact of personalized learning pathways with KPIs and scatter plot."""
+    st.subheader("🎯 Adaptivity Impact Analysis")
+
     conn = get_connection()
     df_logs = pd.read_sql("SELECT * FROM adaptivity_log WHERE student_id = ?", conn, params=(student_id,))
     conn.close()
@@ -2402,21 +2507,67 @@ def show_adaptivity_monitoring(student_id):
         st.info("No adaptivity logs found for this student. Complete a recommended module to see analysis.")
         return
 
+    # Compute stats
+    with_scores = df_logs.dropna(subset=['pre_score','post_score'])
+    avg_imp = (with_scores['post_score'] - with_scores['pre_score']).mean() if not with_scores.empty else 0
+    pct_improved = ((with_scores['post_score'] > with_scores['pre_score']).sum() / len(with_scores) * 100) if not with_scores.empty else 0
+    follow_through = len(df_logs[df_logs['action_taken'] == 'started_recommended_video'])
+
+    # KPI cards
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Interventions", len(df_logs))
+    c2.metric("Avg. Score Improvement", f"{avg_imp:.1f} pts" if not with_scores.empty else "N/A")
+    c3.metric("Students Improved", f"{pct_improved:.0f}%" if not with_scores.empty else "N/A")
+
     col1, col2 = st.columns(2)
     with col1:
-        count = len(df_logs)
-        st.metric("Total Interventions Tracked", count)
-        st.caption("Includes started videos and completed exercises.")
-    
-    with col2:
-        # Show a summary of actions
+        # Action breakdown bar chart
+        st.subheader("Action Breakdown")
         action_counts = df_logs['action_taken'].value_counts().reset_index()
         action_counts.columns = ['Action', 'Count']
-        chart = alt.Chart(action_counts).mark_bar().encode(
-            x='Action',
-            y='Count',
-            color='Action'
-        ).properties(height=300)
+        chart = alt.Chart(action_counts).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
+            x=alt.X('Action:N', title=None),
+            y=alt.Y('Count:Q'),
+            color=alt.Color('Action:N', scale=alt.Scale(scheme='blues')),
+            tooltip=['Action','Count']
+        ).properties(height=260)
+        st.altair_chart(chart, use_container_width=True)
+
+    with col2:
+        # Scatter: pre vs post scores
+        if not with_scores.empty:
+            st.subheader("Baseline vs. Post-Intervention")
+            scatter = alt.Chart(with_scores).mark_circle(size=80, opacity=0.8).encode(
+                x=alt.X('pre_score:Q', title='Pre-Intervention Score'),
+                y=alt.Y('post_score:Q', title='Post-Intervention Score'),
+                color=alt.condition(
+                    alt.datum.post_score > alt.datum.pre_score,
+                    alt.value('#00D4AA'), alt.value('#FF4D6A')
+                ),
+                tooltip=['pre_score','post_score','action_taken']
+            ).properties(height=260)
+            # Diagonal reference line
+            max_val = max(with_scores[['pre_score','post_score']].max())
+            line_data = pd.DataFrame({'x':[0, max_val], 'y':[0, max_val]})
+            line = alt.Chart(line_data).mark_line(color='gray', strokeDash=[4,4]).encode(
+                x='x:Q', y='y:Q'
+            )
+            st.altair_chart((scatter + line), use_container_width=True)
+        else:
+            st.info("Score data will appear here once recommended modules are completed.")
+
+    # Time-series effectiveness
+    if 'timestamp' in df_logs.columns and not with_scores.empty:
+        st.subheader("📈 Rolling Improvement Over Time")
+        ts_df = with_scores.copy()
+        ts_df['timestamp'] = pd.to_datetime(ts_df['timestamp'])
+        ts_df['improvement'] = ts_df['post_score'] - ts_df['pre_score']
+        ts_df = ts_df.sort_values('timestamp')
+        chart = alt.Chart(ts_df).mark_line(point=True, color='#6C63FF').encode(
+            x=alt.X('timestamp:T', title='Date'),
+            y=alt.Y('improvement:Q', title='Score Improvement'),
+            tooltip=['timestamp:T','improvement:Q','action_taken:N']
+        ).properties(height=220)
         st.altair_chart(chart, use_container_width=True)
 
 def show_video_engagement(student_id):
