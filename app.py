@@ -732,6 +732,18 @@ def run_student_evaluation_hub():
                 st.rerun()
                 
             if col_b.button("🏠 No, Logout", use_container_width=True):
+                # Completely reset student session on logout
+                st.session_state.student_session = {
+                    "student_id": None,
+                    "current_step": "Login",
+                    "completed_modules": [],
+                    "scores": {},
+                    "assignments": {},
+                    "assignment_scores": {},
+                    "start_time": pd.Timestamp.now(),
+                    "module_times": {},
+                    "user_answers_cache": {}
+                }
                 st.session_state.app_mode = "Landing"
                 st.rerun()
 
