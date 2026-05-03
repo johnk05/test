@@ -820,6 +820,26 @@ def export_student_data_to_excel(sess):
     df_new = pd.DataFrame(data)
     
     # Excel Automation (.xlsx)
+def load_active_dataset(papaparse_data=None, source="Live"):
+    """
+    Loads student data from DB or uploaded CSV.
+    source can be "Live" or "Prescriptive"
+    """
+    from db_utils import get_connection, PRESCRIPTIVE_DB
+    
+    if papaparse_data:
+        df = pd.DataFrame(papaparse_data)
+        return df, "Uploaded Dataset", "uploaded"
+    
+    # Otherwise, fetch from selected DB
+    db_file = PRESCRIPTIVE_DB if source == "Prescriptive" else "edugrowth.db"
+    conn = get_connection(db_file)
+    df = pd.read_sql("SELECT * FROM students", conn)
+    conn.close()
+    
+    label = "Live Operational Data" if source == "Live" else "Prescriptive (Recommendation Impact)"
+    return df, label, source.lower()
+
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_new.to_excel(writer, index=False, sheet_name='Performance_Report')
@@ -1012,43 +1032,22 @@ def load_artifacts():
 
 
 @st.cache_data
-def load_data():
-    """Load student dataset."""
-    return pd.read_csv(DATA_PATH)
-
-
-def load_active_dataset(papaparse_data=None):
-    """Load the primary student dataset with Demo Mode fallback."""
+def load_active_dataset(papaparse_data=None, source="Live"):
+    """Loads student data from DB or uploaded CSV. source can be 'Live' or 'Prescriptive'."""
+    from db_utils import get_connection, PRESCRIPTIVE_DB
+    
     if papaparse_data:
         df = pd.DataFrame(papaparse_data)
-        return df, "📂 Custom Uploaded Dataset", "custom"
+        return df, "📂 Uploaded Dataset", "uploaded"
     
-    # Check for existing sync file
-    import os
-    if os.path.exists("synthetic_student_data.csv"):
-        try:
-            df = pd.read_csv("synthetic_student_data.csv")
-            return df, "📊 Active Student Database (Synced)", "synced"
-        except:
-            pass
-
-    # Demo Mode Fallback
-    st.sidebar.warning("🛠️ Demo Mode Active: No dataset uploaded.")
-    demo_data = []
-    for i in range(100):
-        demo_data.append({
-            "student_id": 20001 + i,
-            "region": "Urban",
-            "time_spent": 10.0 + (i % 5),
-            "modules_completed": 4,
-            "quiz_score": 75.0 + (i % 25),
-            "assignment_timeliness": 85.0 + (i % 15),
-            "interaction_level": 70.0 + (i % 30),
-            "consistency_index": 0.85,
-            "engagement_score": 80.0,
-            "learning_trend": "Increasing"
-        })
-    return pd.DataFrame(demo_data), "✨ Institutional Demo Dataset (Auto-Generated)", "demo"
+    # Otherwise, fetch from selected DB
+    db_file = PRESCRIPTIVE_DB if source == "Prescriptive" else "edugrowth.db"
+    conn = get_connection(db_file)
+    df = pd.read_sql("SELECT * FROM students", conn)
+    conn.close()
+    
+    label = "📡 Live Operational Data" if source == "Live" else "🎯 Prescriptive (Impact View)"
+    return df, label, source.lower()
 
 
 def validate_dataset(df):
@@ -1468,6 +1467,26 @@ def show_quiz_analysis(row, quiz_analysis):
     category_col.metric("Quiz Category", quiz_analysis["category"])
     time_col.metric("Time Spent", f"{format_value(row.get('time_spent', 0))} hours")
     efficiency_col.metric("Efficiency", quiz_analysis["interpretation"].split(":")[0])
+    
+    # Show Prescriptive Constraints if available
+    from db_utils import get_connection, PRESCRIPTIVE_DB
+    conn = get_connection(PRESCRIPTIVE_DB)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM prescriptive_constraints WHERE student_id = ?", (int(row['student_id']),))
+    constraint = cursor.fetchone()
+    conn.close()
+    
+    if constraint:
+        st.markdown(f"""
+        <div style='background:rgba(61,214,140,0.1); border:1px solid rgba(61,214,140,0.3); border-radius:10px; padding:1.2rem; margin:1rem 0;'>
+            <div style='color:#3dd68c; font-weight:800; font-size:0.8rem; text-transform:uppercase; margin-bottom:0.5rem;'>🎯 Prescriptive Goal (Recommendation Impact)</div>
+            <div style='display:grid; grid-template-columns: repeat(3, 1fr); gap:1rem;'>
+                <div><small>Target Quiz</small><br><strong>{constraint[2]}%</strong></div>
+                <div><small>Engagement Boost</small><br><strong>+{constraint[3]}%</strong></div>
+                <div><small>Status</small><br><strong>{constraint[4]}</strong></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.progress(progress_value)
 
@@ -2676,11 +2695,16 @@ def main():
             
         model_name = st.selectbox("Select Model", list(MODEL_PATHS.keys()))
         
-        st.markdown("<div style='margin-bottom:0.4rem;font-size:0.85rem;font-weight:700;color:var(--text-soft);'>Upload next student dataset</div>", unsafe_allow_html=True)
+        st.markdown("---")
+        st.markdown("### Data Configuration")
+        data_source = st.radio("Analytics Source", ["Live", "Prescriptive"], 
+                             help="Switch between current student data and recommendation-augmented data.")
+        
+        st.markdown("<div style='margin-bottom:0.4rem;font-size:0.85rem;font-weight:700;color:var(--text-soft);'>Manual Dataset Override</div>", unsafe_allow_html=True)
         papaparse_data = papaparse_uploader()
 
     try:
-        raw_df, dataset_name, dataset_key = load_active_dataset(papaparse_data)
+        raw_df, dataset_name, dataset_key = load_active_dataset(papaparse_data, source=data_source)
         missing_columns = validate_dataset(raw_df)
         if missing_columns:
             st.error(

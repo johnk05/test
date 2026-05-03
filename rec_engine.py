@@ -43,16 +43,44 @@ def generate_recommendations(student_id, module_id, quiz_score, sentiment_label=
         video = cursor.fetchone()
 
     if video:
-        rec_id, title, url = video
+        rec_id_val, title, url = video
         full_rec_text = f"{rec_text} Suggested resource: {title}"
         
-        # Save recommendation to DB
-        cursor.execute("""
-            INSERT INTO recommendations (student_id, module_id, recommendation_text, recommended_video_id)
-            VALUES (?, ?, ?, ?)
-        """, (student_id, module_id, full_rec_text, rec_id))
-        conn.commit()
+        # Save recommendation to BOTH DBs
+        from db_utils import PRESCRIPTIVE_DB
+        for db_file in [get_connection(), get_connection(PRESCRIPTIVE_DB)]:
+            db_conn = db_file
+            cursor_db = db_conn.cursor()
+            cursor_db.execute("""
+                INSERT INTO recommendations (student_id, module_id, recommendation_text, recommended_video_id)
+                VALUES (?, ?, ?, ?)
+            """, (student_id, module_id, full_rec_text, rec_id_val))
+            db_conn.commit()
+            db_conn.close()
         
+        # Generate Prescriptive Constraints for Prediction Tab
+        # We calculate the "Optimized" state based on the recommendation
+        target_quiz = min(100, quiz_score + 15) # Assume 15% improvement
+        engagement_boost = 20.0 # Assume 20% engagement boost
+        
+        conn_p = get_connection(PRESCRIPTIVE_DB)
+        cursor_p = conn_p.cursor()
+        cursor_p.execute("""
+            INSERT OR REPLACE INTO prescriptive_constraints 
+            (student_id, suggested_time_increase, target_quiz_score, recommended_engagement_boost, predicted_impact_label)
+            VALUES (?, ?, ?, ?, ?)
+        """, (student_id, 0.5, target_quiz, engagement_boost, "Expected Improvement"))
+        
+        # Also update the 'students' table in prescriptive DB to reflect the target state
+        cursor_p.execute("""
+            UPDATE students 
+            SET quiz_score = ?, engagement_score = engagement_score + ?
+            WHERE student_id = ?
+        """, (target_quiz, engagement_boost, student_id))
+        
+        conn_p.commit()
+        conn_p.close()
+
         recommendations.append({
             "text": full_rec_text,
             "video_url": url,
