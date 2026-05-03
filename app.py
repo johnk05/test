@@ -50,269 +50,18 @@ def escape_html(value):
 
 
 def inject_styles():
-    """Apply professional premium dashboard styling."""
-    st.markdown(
-        """
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        
-        html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
-        
-        :root {
-            --surface: rgba(13, 17, 23, 0.7);
-            --surface-strong: rgba(255, 255, 255, 0.08);
-            --surface-hover: rgba(255, 255, 255, 0.12);
-            --line: rgba(255, 255, 255, 0.1);
-            --line-strong: rgba(255, 255, 255, 0.2);
-            --text: #f0f4ff;
-            --text-muted: rgba(200, 210, 240, 0.6);
-            --text-soft: rgba(220, 228, 255, 0.8);
-            --blue: #4f9eff;
-            --blue-glow: rgba(79, 158, 255, 0.25);
-            --green: #3dd68c;
-            --amber: #f5c542;
-            --red: #ff6b6b;
-            --purple: #a78bfa;
-            --radius: 20px;
-            --radius-sm: 12px;
-        }
-
-        .stApp {
-            background: radial-gradient(circle at 0% 0%, rgba(79, 158, 255, 0.05) 0%, transparent 50%),
-                        radial-gradient(circle at 100% 100%, rgba(167, 139, 250, 0.05) 0%, transparent 50%),
-                        #05070a;
-        }
-
-        .block-container { padding: 2rem 3rem 4rem; max-width: 1400px; }
-        
-        /* Glassmorphism base */
-        .glass {
-            background: var(--surface);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        }
-
-        h1, h2, h3, h4 { font-family: 'Inter', sans-serif !important; letter-spacing: -0.03em !important; color: var(--text) !important; }
-        h1 { font-size: 3.2rem !important; font-weight: 900 !important; line-height: 1.05 !important; }
-        h2 { font-size: 1.8rem !important; font-weight: 800 !important; }
-
-        .stButton > button {
-            border-radius: var(--radius-sm); 
-            min-height: 3rem; 
-            font-weight: 700;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            letter-spacing: 0.02em;
-            border: 1px solid var(--line);
-            background: var(--surface-strong);
-            color: var(--text);
-        }
-
-        .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #4f9eff, #7c3aed);
-            border: none; 
-            box-shadow: 0 4px 15px rgba(79, 158, 255, 0.3);
-        }
-
-        .stButton > button[kind="primary"]:hover { 
-            transform: translateY(-2px) scale(1.02); 
-            box-shadow: 0 10px 30px rgba(79, 158, 255, 0.5); 
-        }
-
-        .mode-card {
-            background: var(--surface);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            padding: 3rem 2.5rem;
-            text-align: center;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .mode-card:hover {
-            border-color: var(--blue);
-            transform: translateY(-10px);
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(79, 158, 255, 0.15);
-        }
-
-        .login-card {
-            max-width: 520px;
-            margin: 5rem auto;
-            background: var(--surface);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--line-strong);
-            border-radius: var(--radius);
-            padding: 4rem 3rem;
-            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
-            text-align: center;
-        }
-
-        .video-card {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: var(--radius-sm);
-            padding: 1.8rem;
-            transition: all 0.3s ease;
-        }
-
-        .video-card:hover {
-            border-color: var(--blue);
-            background: var(--surface-strong);
-            transform: scale(1.02);
-        }
-
-        .quiz-container {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            padding: 2.5rem;
-            margin-top: 2rem;
-        }
-
-        /* Metrics styling */
-        div[data-testid="stMetric"] {
-            background: var(--surface);
-            backdrop-filter: blur(8px);
-            border: 1px solid var(--line);
-            border-radius: var(--radius-sm);
-            padding: 1.2rem;
-        }
-
-        /* Sidebar styling */
-        [data-testid="stSidebar"] {
-            background-color: #080a0f !important;
-            border-right: 1px solid var(--line);
-        }
-
-        /* Cinematic Background Particles */
-        .stApp::before {
-            content: "";
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle at 20% 30%, rgba(79, 158, 255, 0.03) 0%, transparent 40%),
-                        radial-gradient(circle at 80% 70%, rgba(167, 139, 250, 0.03) 0%, transparent 40%);
-            z-index: -1;
-            pointer-events: none;
-        }
-
-        @keyframes drift {
-            0% { transform: translate(0, 0) scale(1); opacity: 0.3; }
-            50% { transform: translate(30px, -30px) scale(1.1); opacity: 0.6; }
-            100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
-        }
-
-        .particle {
-            position: fixed;
-            width: 4px; height: 4px;
-            background: var(--blue);
-            border-radius: 50%;
-            filter: blur(2px);
-            z-index: -1;
-            opacity: 0.4;
-            animation: drift 12s infinite ease-in-out;
-        }
-
-        .app-header {
-            position: relative; overflow: hidden;
-            border: 1px solid var(--line); border-radius: var(--radius);
-            padding: 2.5rem; margin-bottom: 2rem;
-            background: linear-gradient(135deg, #0d1117 0%, #111827 100%);
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-        }
-        .app-header::after { content:""; position:absolute; inset:auto 0 0 0; height:3px; background:linear-gradient(90deg,var(--blue),var(--purple),var(--green)); }
-        .app-eyebrow { color: var(--blue); font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 0.8rem; }
-        .app-title { color: #fff; font-size: 2.5rem; font-weight: 900; line-height: 1.1; margin-bottom: 0.8rem; }
-        .app-subtitle { color: var(--text-muted); font-size: 1rem; line-height: 1.6; max-width: 800px; margin-bottom: 1.5rem; }
-        .header-chip { display: inline-block; border-radius: 999px; padding: 0.4rem 1rem; margin: 0.5rem 0.5rem 0 0; font-size: 0.85rem; font-weight: 700; color: var(--text-soft); background: var(--surface-strong); border: 1px solid var(--line); }
-
-        .learning-card { 
-            border: 1px solid var(--line); border-radius: var(--radius-sm); 
-            background: linear-gradient(180deg, var(--surface-strong), var(--surface)); 
-            padding: 1.5rem; min-height: 140px; 
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2); 
-            transition: transform 0.3s;
-        }
-        .learning-card:hover { transform: translateY(-5px); border-color: var(--blue); }
-        .learning-card-label { color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.8rem; }
-        .learning-card-value { color: #fff; font-size: 2rem; font-weight: 900; line-height: 1; }
-        .learning-card-note { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.8rem; }
-
-        .profile-hero { 
-            border: 1px solid var(--line); border-radius: var(--radius); 
-            padding: 2.5rem; background: linear-gradient(135deg, #111827, #0d1117); 
-            box-shadow: 0 15px 45px rgba(0,0,0,0.3); margin-bottom: 2rem; 
-        }
-        .profile-name { font-size: 2.2rem; font-weight: 900; color: #fff; margin-bottom: 0.5rem; }
-        .profile-meta { color: var(--text-muted); font-size: 1rem; }
-        .profile-score-value { font-size: 3rem; font-weight: 900; color: #fff; line-height: 1; }
-
-        /* Command Center Layout */
-        .command-center {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .narrative-box {
-            background: rgba(79, 158, 255, 0.05);
-            border: 1px solid var(--blue);
-            border-radius: var(--radius-sm);
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-            line-height: 1.8;
-            font-size: 1.05rem;
-            color: var(--text-soft);
-        }
-
-        .status-pill { display: inline-block; border-radius: 999px; padding: 0.4rem 1rem; font-size: 0.85rem; font-weight: 700; margin-top: 1rem; }
-        .status-good { color: var(--green); background: rgba(61, 214, 140, 0.1); border: 1px solid var(--green); }
-        .status-watch { color: var(--amber); background: rgba(245, 197, 66, 0.1); border: 1px solid var(--amber); }
-        .status-risk { color: var(--red); background: rgba(255, 107, 107, 0.1); border: 1px solid var(--red); }
-
-        .rec-item, .risk-card { 
-            border: 1px solid var(--line); border-radius: var(--radius-sm); 
-            padding: 1.2rem; margin: 0.8rem 0; background: var(--surface); 
-            color: var(--text-soft); line-height: 1.6; transition: all 0.2s; 
-        }
-        .rec-item:hover { background: var(--surface-strong); transform: translateX(5px); border-color: var(--blue); }
-        .rec-index { display: inline-flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; margin-right: 0.8rem; background: var(--blue); color: #fff; font-size: 0.8rem; font-weight: 800; }
-        .risk-card { border-left: 4px solid var(--red); background: rgba(255, 107, 107, 0.05); }
-
-        .section-kicker { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem; }
-        .action-strip { background: var(--blue-glow); border: 1px solid var(--blue); border-radius: var(--radius-sm); padding: 1.2rem; margin-bottom: 2rem; color: var(--text-soft); }
-
-        .badge-pending { border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.8rem; font-weight: 700; background: rgba(245, 197, 66, 0.1); color: var(--amber); border: 1px solid var(--amber); }
-        .badge-done { border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.8rem; font-weight: 700; background: rgba(61, 214, 140, 0.1); color: var(--green); border: 1px solid var(--green); }
-        .progress-bar-wrap { background: var(--surface-strong); border-radius: 999px; height: 8px; margin: 1.5rem 0; overflow: hidden; }
-
-        .hub-header {
-            background: linear-gradient(135deg, rgba(79, 158, 255, 0.1), rgba(167, 139, 250, 0.1));
-            border: 1px solid var(--line);
-            border-radius: var(--radius);
-            padding: 2.5rem;
-            margin-bottom: 2rem;
-        }
-
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .fade-in { animation: fadeIn 0.8s ease-out forwards; }
-
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    """Apply professional EduGrowth design system."""
+    from styles import EDUGROWTH_CSS
+    st.markdown(EDUGROWTH_CSS, unsafe_allow_html=True)
+    # Sidebar branding
+    with st.sidebar:
+        st.markdown("""
+        <div class='sidebar-logo'>
+            <div class='sidebar-logo-icon'>🎓</div>
+            <div class='sidebar-logo-text'>EduGrowth</div>
+            <div class='sidebar-logo-sub'>Intelligence Platform</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 
@@ -437,13 +186,15 @@ def run_student_evaluation_hub():
     if sess["current_step"] == "Login":
         st.markdown("""
         <div class='login-card fade-in'>
-            <div style='font-size:4.5rem; margin-bottom:2rem;'>👤</div>
-            <h2 style='margin-bottom:2.5rem;'>Student Evaluation Access</h2>
+            <div style='font-size:4.5rem; margin-bottom:1.5rem;'>👤</div>
+            <h2 style='margin-bottom:1rem;'>Student Evaluation Access</h2>
+            <p style='color:var(--text-muted); font-size:0.9rem; margin-bottom:2rem;'>Enter your credentials to begin your learning journey</p>
             <div style='text-align:left;'>
         """, unsafe_allow_html=True)
         _, center, _ = st.columns([1, 2, 1])
         with center:
-            student_id_input = st.text_input("Student ID", placeholder="e.g. 1001", key="student_login_id", label_visibility="collapsed")
+            student_id_input = st.text_input("🆔 Student ID", placeholder="e.g. 1001", key="student_login_id")
+            region_input = st.selectbox("🌍 Region", ["Urban", "Rural", "Suburban"], key="student_region_input", help="Select your geographical region for better prediction accuracy.")
             st.markdown("<div style='margin-top:1.2rem;'></div>", unsafe_allow_html=True)
             if st.button("Initialize Evaluation Sequence  →", type="primary", use_container_width=True):
                 if student_id_input:
@@ -459,6 +210,7 @@ def run_student_evaluation_hub():
                             sess["profile_data"] = None
                             st.info("New student detected. Creating session...")
                         
+                        sess["region"] = region_input
                         sess["current_step"] = "Learning"
                         st.rerun()
                     except ValueError:
@@ -804,7 +556,7 @@ def export_student_data_to_excel(sess):
     
     data = {
         "student_id": [int_id],
-        "region": ["Urban"],
+        "region": [sess.get("region", "Urban")],
         "time_spent": [total_time],
         "modules_completed": [len(sess["completed_modules"])],
         "quiz_score": [avg_quiz_score],
@@ -820,26 +572,6 @@ def export_student_data_to_excel(sess):
     df_new = pd.DataFrame(data)
     
     # Excel Automation (.xlsx)
-def load_active_dataset(papaparse_data=None, source="Live"):
-    """
-    Loads student data from DB or uploaded CSV.
-    source can be "Live" or "Prescriptive"
-    """
-    from db_utils import get_connection, PRESCRIPTIVE_DB
-    
-    if papaparse_data:
-        df = pd.DataFrame(papaparse_data)
-        return df, "Uploaded Dataset", "uploaded"
-    
-    # Otherwise, fetch from selected DB
-    db_file = PRESCRIPTIVE_DB if source == "Prescriptive" else "edugrowth.db"
-    conn = get_connection(db_file)
-    df = pd.read_sql("SELECT * FROM students", conn)
-    conn.close()
-    
-    label = "Live Operational Data" if source == "Live" else "Prescriptive (Recommendation Impact)"
-    return df, label, source.lower()
-
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         df_new.to_excel(writer, index=False, sheet_name='Performance_Report')
