@@ -522,9 +522,48 @@ def run_student_evaluation_hub():
         conn.close()
 
         # Streamlit Player
-        player_state = st_player(mod["url"], key=f"player_{mod['id']}")
-        current_time = player_state.seconds
+        st_player(mod["url"], key=f"player_{mod['id']}")
         
+        # Track time based on real-world duration since entering module
+        if "module_entry_time" not in sess:
+            sess["module_entry_time"] = pd.Timestamp.now()
+            
+        elapsed_seconds = (pd.Timestamp.now() - sess["module_entry_time"]).total_seconds()
+        current_time = int(elapsed_seconds)
+        
+        # Check if this module was a recommendation
+        if "recs_checked" not in sess:
+            sess["recs_checked"] = []
+        
+        if mod['id'] not in sess["recs_checked"]:
+            conn = get_connection()
+            cursor = conn.cursor()
+            # Find a pending recommendation for this video
+            cursor.execute("""
+                SELECT rec_id, module_id FROM recommendations 
+                WHERE student_id = ? AND recommended_video_id = ? AND status = 'pending'
+            """, (sess["student_id"], mod['id']))
+            rec = cursor.fetchone()
+            if rec:
+                rec_id, trigger_module_id = rec
+                # Get the score that triggered this recommendation
+                cursor.execute("SELECT quiz_score FROM students WHERE student_id = ?", (sess["student_id"],))
+                # Actually, let's look at the specific score for trigger_module_id if possible
+                # But our current schema is a bit simple. Let's use the session score if available
+                pre_score = sess["scores"].get(trigger_module_id, 0)
+                
+                # Log that student started recommended module
+                cursor.execute("""
+                    INSERT INTO adaptivity_log (student_id, recommendation_id, action_taken, module_id, pre_score)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (sess["student_id"], rec_id, "started_recommended_video", mod['id'], pre_score))
+                # Update recommendation status
+                cursor.execute("UPDATE recommendations SET status = 'completed' WHERE rec_id = ?", (rec_id,))
+                conn.commit()
+                st.info("🌟 You are following a personalized recommendation!")
+            conn.close()
+            sess["recs_checked"].append(mod['id'])
+
         # Knowledge Check Interruption Logic
         if "interrupted_points" not in sess:
             sess["interrupted_points"] = []
@@ -535,12 +574,10 @@ def run_student_evaluation_hub():
                 st.warning(f"🚀 Knowledge Check! You've reached a critical learning point at {cp}s.")
                 with st.expander("📝 Mid-Module Knowledge Check", expanded=True):
                     st.write("Quick question to ensure you're following along:")
-                    # Generate a simple question from transcript or use a default
                     q_text = f"Based on the concept discussed around {cp} seconds, what is the main takeaway?"
                     st.text_input(q_text, key=f"kc_{mod['id']}_{cp}")
                     if st.button("Continue Learning", key=f"btn_kc_{cp}"):
                         st.success("Great! Keep watching.")
-                        # In a real app, we'd pause the video here using JS
                 break
 
         with st.expander("📄  View Video Transcript"):
@@ -583,6 +620,14 @@ def run_student_evaluation_hub():
                     INSERT INTO feedback (student_id, module_id, feedback_text, sentiment_score, sentiment_label)
                     VALUES (?, ?, ?, ?, ?)
                 """, (sess["student_id"], mod["id"], feedback_text, sentiment_score, sentiment_label))
+                
+                # Check if this was a recommended module and update post_score
+                cursor.execute("""
+                    UPDATE adaptivity_log 
+                    SET post_score = ? 
+                    WHERE student_id = ? AND module_id = ? AND post_score IS NULL
+                """, (score, sess["student_id"], mod["id"]))
+                
                 conn.commit()
                 conn.close()
                 
@@ -2418,51 +2463,67 @@ def show_sentiment_dashboard(student_id):
         """, unsafe_allow_html=True)
 
 def show_recommendations_accuracy(student_id):
-    """Measure effectiveness of recommendations."""
+    """Measure effectiveness of recommendations based on actual student behavior."""
     st.subheader("Recommendations Effectiveness")
     
-    # Mock data for demonstration if DB is sparse
-    data = {
-        "Metric": ["Quiz Score", "Completion Rate", "Engagement Time"],
-        "Old Videos (Avg)": ["65%", "72%", "12 min"],
-        "Recommended Videos (Avg)": ["78%", "89%", "18 min"],
-        "Improvement": ["+13% ↑", "+17% ↑", "+6 min ↑"]
-    }
-    st.table(pd.DataFrame(data))
-    
     conn = get_connection()
-    df_recs = pd.read_sql("SELECT * FROM recommendations WHERE student_id = ?", conn, params=(student_id,))
+    # Fetch real improvements from adaptivity_log
+    # For simplicity, we compare the score of the module where rec was generated vs the next one
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT AVG(post_score - pre_score) FROM adaptivity_log 
+        WHERE student_id = ? AND action_taken = 'started_recommended_video' AND post_score IS NOT NULL
+    """, (student_id,))
+    avg_improvement = cursor.fetchone()[0] or 0
+    
+    # Track completion of recommended videos
+    cursor.execute("SELECT COUNT(*) FROM recommendations WHERE student_id = ? AND status = 'completed'", (student_id,))
+    completed_recs = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM recommendations WHERE student_id = ?", (student_id,))
+    total_recs = cursor.fetchone()[0]
+    completion_rate = (completed_recs / total_recs * 100) if total_recs > 0 else 0
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Avg. Improvement (Points)", f"{avg_improvement:.2f}")
+    with col2:
+        st.metric("Recommendation Completion Rate", f"{completion_rate:.1f}%")
+
+    df_recs = pd.read_sql("SELECT timestamp, recommendation_text, status FROM recommendations WHERE student_id = ?", conn, params=(student_id,))
     conn.close()
     
     if not df_recs.empty:
         st.subheader("Individual Recommendation Tracking")
-        st.dataframe(df_recs[['timestamp', 'recommendation_text', 'status']], use_container_width=True)
+        st.dataframe(df_recs, use_container_width=True)
     else:
         st.info("No personalized recommendations tracked for this student yet.")
 
 def show_adaptivity_monitoring(student_id):
-    """Statistical impact of personalized learning pathways."""
+    """Statistical impact of personalized learning pathways using real student data."""
     st.subheader("Adaptivity Impact Analysis")
     
+    conn = get_connection()
+    df_logs = pd.read_sql("SELECT * FROM adaptivity_log WHERE student_id = ?", conn, params=(student_id,))
+    conn.close()
+
+    if df_logs.empty:
+        st.info("No adaptivity logs found for this student. Complete a recommended module to see analysis.")
+        return
+
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Avg. Improvement", "+15.4%", delta="2.1%")
-        st.metric("Significance (p-value)", "0.034", delta="Significant", delta_color="normal")
+        count = len(df_logs)
+        st.metric("Total Interventions Tracked", count)
+        st.caption("Includes started videos and completed exercises.")
     
     with col2:
-        # Scatter plot for improvement
-        import numpy as np
-        n = 20
-        df_stats = pd.DataFrame({
-            'Baseline': np.random.uniform(50, 80, n),
-            'Improvement': np.random.uniform(5, 25, n),
-            'Type': np.random.choice(['Video', 'Practice', 'Collaboration'], n)
-        })
-        chart = alt.Chart(df_stats).mark_circle(size=60).encode(
-            x='Baseline',
-            y='Improvement',
-            color='Type',
-            tooltip=['Baseline', 'Improvement', 'Type']
+        # Show a summary of actions
+        action_counts = df_logs['action_taken'].value_counts().reset_index()
+        action_counts.columns = ['Action', 'Count']
+        chart = alt.Chart(action_counts).mark_bar().encode(
+            x='Action',
+            y='Count',
+            color='Action'
         ).properties(height=300)
         st.altair_chart(chart, use_container_width=True)
 

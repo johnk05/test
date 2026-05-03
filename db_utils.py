@@ -25,6 +25,7 @@ def init_db():
         consistency_index REAL,
         engagement_score REAL,
         learning_trend TEXT,
+        performance_label TEXT,
         learning_velocity REAL,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -109,10 +110,16 @@ def init_db():
         csv_path = "synthetic_student_data.csv"
         if os.path.exists(csv_path):
             df = pd.read_csv(csv_path)
-            # Ensure columns match
-            # The CSV might not have all columns, so we'll only import what we have
-            df.to_sql("students", conn, if_exists="append", index=False)
-            print(f"Imported {len(df)} students from {csv_path}")
+            # Filter columns to only those that exist in the table
+            table_cols = [
+                "student_id", "name", "region", "time_spent", "modules_completed", 
+                "quiz_score", "assignment_timeliness", "interaction_level", 
+                "consistency_index", "engagement_score", "learning_trend", 
+                "performance_label", "learning_velocity"
+            ]
+            df_to_import = df[[col for col in df.columns if col in table_cols]]
+            df_to_import.to_sql("students", conn, if_exists="append", index=False)
+            print(f"Imported {len(df_to_import)} students from {csv_path}")
 
     # Seed Video Library if empty
     cursor.execute("SELECT COUNT(*) FROM video_library")
