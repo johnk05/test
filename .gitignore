@@ -1,5 +1,5 @@
 __pycache__/
 *.pyc
 .streamlit/
-synthetic_student_data.csv
+# synthetic_student_data.csv
 eval_student_*.csv
