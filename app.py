@@ -587,10 +587,26 @@ def run_student_evaluation_hub():
         st.markdown("<h3 style='margin-bottom:0.3rem;'>📝 Comprehensive Final Quiz</h3>", unsafe_allow_html=True)
         st.markdown(f"<p style='color:rgba(200,210,240,0.65); font-size:0.9rem; margin-bottom:1.5rem;'>Answer all 15 questions based on the video content above.</p>", unsafe_allow_html=True)
 
+        if "user_answers_cache" not in sess:
+            sess["user_answers_cache"] = {}
+        if mod["id"] not in sess["user_answers_cache"]:
+            sess["user_answers_cache"][mod["id"]] = {}
+
         user_answers = {}
         for idx, q in enumerate(mod["quiz"]):
             st.markdown(f"<div style='font-size:0.78rem; font-weight:700; color:#4f9eff; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.2rem;'>Question {idx+1} of 15</div>", unsafe_allow_html=True)
-            user_answers[idx] = st.radio(q["q"], q["options"], key=f"q_{mod['id']}_{idx}", label_visibility="visible", index=None)
+            
+            # Determine default index if previously answered
+            default_val = sess["user_answers_cache"][mod["id"]].get(idx)
+            default_index = q["options"].index(default_val) if default_val in q["options"] else None
+            
+            user_answers[idx] = st.radio(
+                q["q"], 
+                q["options"], 
+                key=f"q_{mod['id']}_{idx}", 
+                label_visibility="visible", 
+                index=default_index
+            )
             st.markdown("<hr style='border:none; border-top:1px solid rgba(255,255,255,0.06); margin:0.8rem 0;'>", unsafe_allow_html=True)
 
         # Feedback Section
@@ -608,7 +624,9 @@ def run_student_evaluation_hub():
             else:
                 score = sum(1 for i, q in enumerate(mod["quiz"]) if user_answers[i] == q["a"])
                 sess["scores"][mod["id"]] = score
-                sess["completed_modules"].append(mod["id"])
+                sess["user_answers_cache"][mod["id"]] = user_answers
+                if mod["id"] not in sess["completed_modules"]:
+                    sess["completed_modules"].append(mod["id"])
                 
                 # Analyze Sentiment
                 sentiment_score, sentiment_label = analyze_sentiment(feedback_text)
