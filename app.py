@@ -598,18 +598,26 @@ def export_student_data_to_excel(sess):
         import os
         if os.path.exists(DATA_PATH):
             main_db = pd.read_csv(DATA_PATH)
-            # Remove old entry if student is retaking
             main_db = main_db[main_db["student_id"] != int_id]
-            
-            # Match columns exactly
             append_df = df_new.drop(columns=["timestamp"], errors="ignore")
             main_db = pd.concat([main_db, append_df], ignore_index=True)
             main_db.to_csv(DATA_PATH, index=False)
-            
-            # Clear Streamlit cache so Option 2 loads the fresh DB immediately
-            load_data.clear()
     except Exception as e:
-        st.error(f"Failed to sync with Prediction DB: {e}")
+        st.error(f"Failed to sync with CSV: {e}")
+
+    # Sync student into SQLite databases so Analytics Matrix can find them
+    from db_utils import get_connection, PRESCRIPTIVE_DB
+    for db_file in ["edugrowth.db", PRESCRIPTIVE_DB]:
+        try:
+            conn = get_connection(db_file)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM students WHERE student_id = ?", (int_id,))
+            insert_df = df_new.drop(columns=["timestamp"], errors="ignore")
+            insert_df.to_sql("students", conn, if_exists="append", index=False)
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            st.warning(f"DB sync warning ({db_file}): {e}")
 
     # Save locally for Option 2 reflection
     df_new.to_csv(f"eval_student_{int_id}.csv", index=False)
