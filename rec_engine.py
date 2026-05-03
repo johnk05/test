@@ -24,16 +24,18 @@ def generate_recommendations(student_id, module_id, quiz_score, sentiment_label=
     if sentiment_label == "Negative":
         rec_text += " We noticed you found this challenging. Don't worry, here is a highly-rated alternative resource."
 
-    # Fetch a recommended video from the library
+    # Map module_id to topic for targeted alternative video selection
+    topic_map = {1: "ML", 2: "Data Science", 3: "AI", 4: "Python"}
+    topic = topic_map.get(module_id, "ML")
+
+    # Fetch a recommended video with matching topic and target difficulty (exclude original module videos 1-4)
     conn = get_connection()
     cursor = conn.cursor()
-    
-    # Try to find a video with the target difficulty and different from current module
     cursor.execute("""
         SELECT video_id, title, youtube_url FROM video_library 
-        WHERE difficulty_level = ? AND video_id != ?
+        WHERE topic = ? AND difficulty_level = ? AND video_id > 10
         LIMIT 1
-    """, (difficulty_target, module_id))
+    """, (topic, difficulty_target))
     
     video = cursor.fetchone()
     

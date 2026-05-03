@@ -348,20 +348,28 @@ def run_student_evaluation_hub():
         cursor.execute("SELECT timestamp_seconds FROM dropout_analysis WHERE video_id = ? AND is_critical_point = 1", (mod['id'],))
         critical_points = [row[0] for row in cursor.fetchall()]
         
-        # Check if there's a recommended replacement video for this module
+        # Check if there's a recommended replacement video for this module (triggered when student struggled here)
         video_url = mod["url"]
         cursor.execute("""
             SELECT v.youtube_url, v.title FROM recommendations r
             JOIN video_library v ON r.recommended_video_id = v.video_id
-            WHERE r.student_id = ? AND r.recommended_video_id = ? AND r.status = 'pending'
+            WHERE r.student_id = ? AND r.module_id = ? AND r.status = 'pending'
             ORDER BY r.timestamp DESC LIMIT 1
         """, (sess["student_id"], mod['id']))
         rec_video = cursor.fetchone()
         conn.close()
-        
+
         if rec_video:
             video_url = rec_video[0]
-            st.info(f"📌 Playing recommended video: **{rec_video[1]}** (based on your previous performance)")
+            st.markdown(f"""
+            <div style='background:rgba(0,212,170,0.08); border:1px solid #00D4AA; border-radius:10px;
+                padding:0.9rem 1.2rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.8rem;'>
+                <span style='font-size:1.4rem;'>🔁</span>
+                <div>
+                    <div style='font-weight:800; color:#00D4AA; font-size:0.85rem;'>Recommended Video</div>
+                    <div style='color:var(--text-soft); font-size:0.9rem;'><strong>{rec_video[1]}</strong> — selected based on your previous performance in this module.</div>
+                </div>
+            </div>""", unsafe_allow_html=True)
 
         # Streamlit Player
         st_player(video_url, key=f"player_{mod['id']}")

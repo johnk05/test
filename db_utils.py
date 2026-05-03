@@ -144,13 +144,23 @@ def init_db():
     # Seed Video Library (Live DB only)
     cursor.execute("SELECT COUNT(*) FROM video_library")
     if cursor.fetchone()[0] == 0:
+        # 4 beginner alternatives (for students who scored < 60%)
+        # 4 intermediate alternatives (for students who scored 60-80%)
         videos = [
-            (1, "Machine Learning Fundamentals", "https://www.youtube.com/watch?v=Gv9_4yMHFhI", "ML", "beginner", 4.5, 0.85),
-            (2, "Data Science Pipeline", "https://www.youtube.com/watch?v=X3paOmcrTjQ", "Data Science", "beginner", 4.2, 0.78),
-            (3, "Neural Networks Explained", "https://www.youtube.com/watch?v=aircAruvnKk", "AI", "intermediate", 4.7, 0.72),
-            (4, "Python for Data Analysis", "https://www.youtube.com/watch?v=r-uOLxNrNk8", "Python", "beginner", 4.8, 0.90)
+            # Module 1 alternatives — ML Fundamentals
+            (11, "ML for Beginners (Full Course)", "https://www.youtube.com/watch?v=NWONeJKn6kc", "ML", "beginner", 4.6, 0.82),
+            (12, "Machine Learning Crash Course", "https://www.youtube.com/watch?v=i_LwzRVP7bg", "ML", "intermediate", 4.5, 0.76),
+            # Module 2 alternatives — Data Science Pipeline
+            (13, "Data Science Full Course for Beginners", "https://www.youtube.com/watch?v=ua-CiDNNj30", "Data Science", "beginner", 4.3, 0.79),
+            (14, "Data Analysis with Python", "https://www.youtube.com/watch?v=r-uOLxNrNk8", "Data Science", "intermediate", 4.4, 0.74),
+            # Module 3 alternatives — Neural Networks
+            (15, "Neural Networks from Scratch", "https://www.youtube.com/watch?v=Wo5dMEP_BbI", "AI", "beginner", 4.7, 0.71),
+            (16, "Deep Learning Specialization Overview", "https://www.youtube.com/watch?v=CS4cs9xVecg", "AI", "intermediate", 4.8, 0.68),
+            # Module 4 alternatives — Python for Data Analysis
+            (17, "Python Pandas Tutorial for Beginners", "https://www.youtube.com/watch?v=vmEHCJofslg", "Python", "beginner", 4.9, 0.88),
+            (18, "Advanced Pandas for Data Science", "https://www.youtube.com/watch?v=PcvsOaixUh8", "Python", "intermediate", 4.6, 0.80),
         ]
-        cursor.executemany("INSERT INTO video_library (video_id, title, youtube_url, topic, difficulty_level, avg_rating, typical_completion_rate) VALUES (?,?,?,?,?,?,?)", videos)
+        cursor.executemany("INSERT OR IGNORE INTO video_library (video_id, title, youtube_url, topic, difficulty_level, avg_rating, typical_completion_rate) VALUES (?,?,?,?,?,?,?)", videos)
 
     # Seed dropout points (Live DB only)
     cursor.execute("SELECT COUNT(*) FROM dropout_analysis")
