@@ -416,6 +416,23 @@ def run_student_evaluation_hub():
         else:
             st.session_state.app_mode = "Landing"
         st.rerun()
+        
+    if sess["student_id"]:
+        st.sidebar.markdown("---")
+        if st.sidebar.button("🗑️ Reset Student Profile", help="Clear all progress and time tracking for this student."):
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE students SET time_spent = 0, modules_completed = 0, quiz_score = 0 WHERE student_id = ?", (sess["student_id"],))
+            cursor.execute("DELETE FROM feedback WHERE student_id = ?", (sess["student_id"],))
+            cursor.execute("DELETE FROM recommendations WHERE student_id = ?", (sess["student_id"],))
+            cursor.execute("DELETE FROM adaptivity_log WHERE student_id = ?", (sess["student_id"],))
+            conn.commit()
+            conn.close()
+            sess["completed_modules"] = []
+            sess["scores"] = {}
+            sess["start_time"] = pd.Timestamp.now()
+            st.sidebar.success("History cleared!")
+            st.rerun()
 
     if sess["current_step"] == "Login":
         st.markdown("""
@@ -454,11 +471,24 @@ def run_student_evaluation_hub():
         completed = len(sess["completed_modules"])
         total = len(VIDEO_MODULES)
         pct = int((completed / total) * 100)
+        
+        # Live Session Timer display
+        elapsed_session = (pd.Timestamp.now() - sess["start_time"]).total_seconds()
+        mins, secs = divmod(int(elapsed_session), 60)
+        
         st.markdown(f"""
         <div class='hub-header'>
-            <div style='font-size:0.78rem; font-weight:800; color:#4f9eff; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.4rem;'>Learning Journey</div>
-            <h2 style='margin-bottom:1.5rem;'>Welcome, Student #{sess['student_id']}</h2>
-            <div style='display:flex; justify-content:space-between; font-size:0.85rem; color:rgba(200,210,240,0.65); margin-bottom:0.3rem;'>
+            <div style='display:flex; justify-content:space-between; align-items:center;'>
+                <div>
+                    <div style='font-size:0.78rem; font-weight:800; color:#4f9eff; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.4rem;'>Learning Journey</div>
+                    <h2 style='margin-bottom:0;'>Welcome, Student #{sess['student_id']}</h2>
+                </div>
+                <div style='text-align:right; background:rgba(79,158,255,0.1); padding:0.8rem 1.2rem; border-radius:12px; border:1px solid rgba(79,158,255,0.2);'>
+                    <div style='font-size:0.7rem; color:#4f9eff; font-weight:800; text-transform:uppercase;'>Session Timer</div>
+                    <div style='font-size:1.4rem; font-weight:800; font-family:monospace; color:#f0f4ff;'>{mins:02d}:{secs:02d}</div>
+                </div>
+            </div>
+            <div style='display:flex; justify-content:space-between; font-size:0.85rem; color:rgba(200,210,240,0.65); margin-bottom:0.3rem; margin-top:1.5rem;'>
                 <span>{completed} of {total} modules completed</span><span>{pct}%</span>
             </div>
             <div class='progress-bar-wrap'>
@@ -631,7 +661,7 @@ def run_student_evaluation_hub():
                 # Analyze Sentiment
                 sentiment_score, sentiment_label = analyze_sentiment(feedback_text)
                 
-                # Save Feedback to DB
+                # Save Feedback & Progress to DB
                 conn = get_connection()
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -639,24 +669,37 @@ def run_student_evaluation_hub():
                     VALUES (?, ?, ?, ?, ?)
                 """, (sess["student_id"], mod["id"], feedback_text, sentiment_score, sentiment_label))
                 
-                # Check if this was a recommended module and update post_score
+                # Update adaptivity log post_score
                 cursor.execute("""
                     UPDATE adaptivity_log 
                     SET post_score = ? 
                     WHERE student_id = ? AND module_id = ? AND post_score IS NULL
                 """, (score, sess["student_id"], mod["id"]))
+                conn.commit()
+                conn.close()
+                # Calculate time spent on this module accurately
+                module_mins = 0
+                if "module_start_time" in sess:
+                    module_mins = (pd.Timestamp.now() - sess["module_start_time"]).total_seconds() / 60
+                    sess["module_times"][mod["id"]] = module_mins
                 
+                # Update total time spent in DB
+                conn = get_connection()
+                cursor = conn.cursor()
+                module_hours = module_mins / 60
+                cursor.execute("""
+                    UPDATE students 
+                    SET time_spent = time_spent + ?,
+                        modules_completed = modules_completed + 1,
+                        quiz_score = (quiz_score + ?) / 2.0
+                    WHERE student_id = ?
+                """, (module_hours, (score/15)*100, sess["student_id"]))
                 conn.commit()
                 conn.close()
                 
                 # Generate Personalized Recommendations
                 recs = generate_recommendations(sess["student_id"], mod["id"], (score/15)*100, sentiment_label)
                 sess["last_recs"] = recs
-                
-                # Calculate time spent on this module
-                if "module_start_time" in sess:
-                    time_diff = (pd.Timestamp.now() - sess["module_start_time"]).total_seconds() / 60
-                    sess["module_times"][mod["id"]] = time_diff
                 
                 sess["current_step"] = "Learning"
                 pct = int((score / 15) * 100)
