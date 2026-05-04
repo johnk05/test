@@ -8,7 +8,135 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_player import st_player
 from learning_content import VIDEO_MODULES
-from db_utils import get_connection, init_db
+from db_utils import get_connection, init_db, DATA_PATH
+
+def log_activity(student_id, activity_type, description):
+    """Logs student activity for the calendar."""
+    try:
+        from db_utils import PRESCRIPTIVE_DB
+        for db_file in ["edugrowth.db", PRESCRIPTIVE_DB]:
+            conn = get_connection(db_file)
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO student_activity (student_id, activity_type, description)
+                VALUES (?, ?, ?)
+            """, (student_id, activity_type, description))
+            conn.commit()
+            conn.close()
+    except Exception as e:
+        print(f"Activity Log Error: {e}")
+
+def render_student_calendar(student_id):
+    """Renders a premium calendar-style activity log with live clock and date selection."""
+    import calendar
+    from datetime import datetime, timedelta
+    import streamlit.components.v1 as components
+    
+    # Date selection in sidebar
+    if "cal_selected_date" not in st.session_state:
+        st.session_state.cal_selected_date = datetime.now().date()
+        
+    selected_date = st.sidebar.date_input("📅 View Activity For", value=st.session_state.cal_selected_date)
+    st.session_state.cal_selected_date = selected_date
+    
+    now = datetime.now()
+    month_name = calendar.month_name[selected_date.month]
+    year = selected_date.year
+    day = selected_date.day
+    
+    # Fetch activities for SELECTED date
+    activities = []
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        date_str_filter = selected_date.strftime('%Y-%m-%d')
+        cursor.execute("""
+            SELECT activity_type, description, timestamp FROM student_activity
+            WHERE student_id = ? AND date(timestamp) = ?
+            ORDER BY timestamp DESC
+        """, (student_id, date_str_filter))
+        activities = cursor.fetchall()
+        conn.close()
+    except:
+        pass
+
+    # --- Container Start ---
+    st.sidebar.markdown("<div style='background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:15px; padding:1.2rem; margin-top:0.5rem;'>", unsafe_allow_html=True)
+
+    # --- Live JS Clock (using components.html for reliable script execution) ---
+    clock_html = f"""
+<div style="font-family: 'Inter', sans-serif; color: white;">
+<div style="font-size:0.75rem; font-weight:700; color:#4f9eff; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.2rem;">Live Session Time</div>
+<div id="clock" style="font-size:1.8rem; font-weight:900; font-family:monospace; margin-bottom:0.2rem;">{now.strftime('%H:%M:%S')}</div>
+<div style="font-size:0.8rem; color:rgba(255,255,255,0.5); font-weight:600;">{now.strftime('%A, %b %d, %Y')}</div>
+</div>
+<script>
+function update() {{
+const n = new Date();
+const s = n.getHours().toString().padStart(2, '0') + ':' + 
+n.getMinutes().toString().padStart(2, '0') + ':' + 
+n.getSeconds().toString().padStart(2, '0');
+const el = document.getElementById('clock');
+if (el) el.innerText = s;
+}}
+setInterval(update, 1000);
+</script>
+"""
+    with st.sidebar:
+        components.html(clock_html, height=100)
+
+    # --- Calendar Grid & Headers (Zero Indentation) ---
+    grid_html = f"<div style='margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(255,255,255,0.05);'>"
+    grid_html += f"<div style='font-size:1.3rem; font-weight:800; color:#fff; margin-bottom:1.2rem;'>{month_name} {year}</div>"
+    grid_html += "<div style='display:grid; grid-template-columns: repeat(7, 1fr); gap:0.4rem; margin-bottom:0.8rem;'>"
+    for d in ['MON','TUE','WED','THU','FRI','SAT','SUN']:
+        grid_html += f"<div style='text-align:center; font-size:0.6rem; color:rgba(255,255,255,0.4); font-weight:800;'>{d}</div>"
+    grid_html += "</div>"
+
+    # Calculate week alignment
+    monday_of_week = selected_date - timedelta(days=selected_date.weekday())
+    grid_html += "<div style='display:grid; grid-template-columns: repeat(7, 1fr); gap:0.4rem; margin-bottom:1.5rem;'>"
+    for i in range(7):
+        current_day = monday_of_week + timedelta(days=i)
+        is_today = current_day == now.date()
+        is_selected = current_day == selected_date
+        bg = "#4f9eff" if is_selected else "rgba(255,255,255,0.05)"
+        border = "1px solid #4f9eff" if is_today and not is_selected else "none"
+        color = "#fff" if is_selected else "rgba(255,255,255,0.6)"
+        grid_html += f"<div style='height:30px; border-radius:6px; background:{bg}; border:{border}; color:{color}; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;'>{current_day.day}</div>"
+    grid_html += "</div></div></div>"
+    
+    st.sidebar.markdown(grid_html, unsafe_allow_html=True)
+
+    # Activities section
+    st.sidebar.markdown("<div style='font-size:0.9rem; font-weight:800; color:#fff; margin-bottom:0.8rem; margin-top:1rem;'>Daily Activity</div>", unsafe_allow_html=True)
+    
+    if not activities:
+        st.sidebar.markdown(f"""
+        <div style='text-align:center; padding:1rem;'>
+            <div style='font-size:2rem; margin-bottom:0.5rem;'>🗓️</div>
+            <div style='font-size:0.8rem; color:rgba(255,255,255,0.4);'>No activity recorded for {selected_date.strftime('%b %d')}.</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        for act_type, desc, ts in activities:
+            try:
+                time_str = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S').strftime('%H:%M')
+            except:
+                time_str = "--:--"
+            icon = "🚀" if act_type == "Login" else "✅" if "Quiz" in act_type else "💡"
+            st.sidebar.markdown(f"""
+            <div style='display:flex; gap:0.8rem; margin-bottom:0.8rem; padding-bottom:0.8rem; border-bottom:1px solid rgba(255,255,255,0.05);'>
+                <div style='font-size:1.1rem;'>{icon}</div>
+                <div>
+                    <div style='font-size:0.8rem; font-weight:700; color:#fff;'>{act_type}</div>
+                    <div style='font-size:0.7rem; color:rgba(255,255,255,0.5);'>{desc}</div>
+                </div>
+                <div style='margin-left:auto; font-size:0.65rem; color:rgba(255,255,255,0.3); font-weight:700;'>{time_str}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.sidebar.markdown("</div>", unsafe_allow_html=True)
 from nlp_utils import analyze_sentiment, extract_topics_from_feedback
 from rec_engine import generate_recommendations, fetch_active_recommendations
 
@@ -18,7 +146,7 @@ init_db()
 papaparse_uploader = components.declare_component("papaparse_uploader", path="papaparse_component")
 
 
-DATA_PATH = "synthetic_student_data.csv"
+
 MODEL_PATHS = {
     "Logistic Regression": "logistic_model.pkl",
     "Random Forest": "rf_model.pkl",
@@ -87,6 +215,9 @@ def show_landing_page():
         """, unsafe_allow_html=True)
         if st.button("🚀  Launch Evaluation Hub", type="primary", width='stretch', key="enter_hub"):
             st.session_state.app_mode = "Option 1"
+            # Clear analytics cache when entering hub
+            if "prediction_result" in st.session_state:
+                del st.session_state.prediction_result
             st.rerun()
 
     with col2:
@@ -100,17 +231,34 @@ def show_landing_page():
         """, unsafe_allow_html=True)
         if st.button("📊  Launch Analytics Matrix", type="primary", width='stretch', key="enter_dashboard"):
             st.session_state.app_mode = "Option 2"
+            # Clear analytics cache to ensure fresh data load
+            if "prediction_result" in st.session_state:
+                del st.session_state.prediction_result
             if "option2_animation_shown" in st.session_state:
                 del st.session_state.option2_animation_shown
             st.rerun()
 
 
+def render_profile_photo(photo_url=None, size=80):
+    """Render a premium circular profile photo with fallback."""
+    if not photo_url:
+        photo_url = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200&h=200"
+    
+    st.markdown(f"""
+        <div style='display:flex; justify-content:center; margin-bottom:1rem;'>
+            <div style='width:{size}px; height:{size}px; border-radius:50%; border:3px solid #4f9eff; 
+                 background-image:url("{photo_url}"); background-size:cover; background-position:center;
+                 box-shadow: 0 4px 15px rgba(79,158,255,0.3);'></div>
+        </div>
+    """, unsafe_allow_html=True)
+
 def fetch_student_profile(student_id):
-    """Fetch complete student profile from SQLite."""
+    """Fetch complete student profile from SQLite with structured output."""
     conn = get_connection()
+    # Use Row factory for easier access
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # Basic student data
     cursor.execute("SELECT * FROM students WHERE student_id = ?", (student_id,))
     student = cursor.fetchone()
     
@@ -118,26 +266,19 @@ def fetch_student_profile(student_id):
         conn.close()
         return None
         
-    # Feedback history
+    student_dict = dict(student)
+    
     cursor.execute("SELECT * FROM feedback WHERE student_id = ?", (student_id,))
-    feedback = cursor.fetchall()
+    student_dict['feedback'] = [dict(r) for r in cursor.fetchall()]
     
-    # Recommendations
     cursor.execute("SELECT * FROM recommendations WHERE student_id = ?", (student_id,))
-    recommendations = cursor.fetchall()
+    student_dict['recommendations'] = [dict(r) for r in cursor.fetchall()]
     
-    # Adaptivity logs
     cursor.execute("SELECT * FROM adaptivity_log WHERE student_id = ?", (student_id,))
-    adaptivity = cursor.fetchall()
+    student_dict['adaptivity'] = [dict(r) for r in cursor.fetchall()]
     
     conn.close()
-    
-    return {
-        "profile": student,
-        "feedback": feedback,
-        "recommendations": recommendations,
-        "adaptivity": adaptivity
-    }
+    return student_dict
 
 
 def run_student_evaluation_hub():
@@ -151,7 +292,8 @@ def run_student_evaluation_hub():
             "assignments": {},
             "assignment_scores": {},
             "start_time": pd.Timestamp.now(),
-            "module_times": {}
+            "module_times": {},
+            "user_answers_cache": {}
         }
     
     sess = st.session_state.student_session
@@ -183,6 +325,11 @@ def run_student_evaluation_hub():
             st.sidebar.success("History cleared!")
             st.rerun()
 
+    # Render Activity Calendar
+    if sess["student_id"]:
+        with st.sidebar:
+            render_student_calendar(sess["student_id"])
+
     if sess["current_step"] == "Login":
         st.markdown("""
         <div class='login-card fade-in'>
@@ -204,7 +351,9 @@ def run_student_evaluation_hub():
                         if profile_data:
                             sess["student_id"] = student_id_input
                             sess["profile_data"] = profile_data
-                            st.success(f"Welcome back, {profile_data['profile'][1]}!")
+                            # Safely access name from dictionary
+                            student_name = profile_data.get('name', f"Student #{student_id_input}")
+                            st.success(f"Welcome back, {student_name}!")
                         else:
                             sess["student_id"] = student_id_input
                             sess["profile_data"] = None
@@ -212,6 +361,7 @@ def run_student_evaluation_hub():
                         
                         sess["region"] = region_input
                         sess["current_step"] = "Learning"
+                        log_activity(student_id_input, "Login", f"Entered the evaluation hub from {region_input}")
                         st.rerun()
                     except ValueError:
                         st.error("Please enter a numeric Student ID.")
@@ -228,37 +378,48 @@ def run_student_evaluation_hub():
         elapsed_session = (pd.Timestamp.now() - sess["start_time"]).total_seconds()
         mins, secs = divmod(int(elapsed_session), 60)
         
+        photo_url = sess.get("profile_data", {}).get("profile_photo") if sess.get("profile_data") else None
+        
         st.markdown(f"""
-        <div class='hub-header'>
-            <div style='display:flex; justify-content:space-between; align-items:center;'>
-                <div>
-                    <div style='font-size:0.78rem; font-weight:800; color:#4f9eff; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.4rem;'>Learning Journey</div>
-                    <h2 style='margin-bottom:0;'>Welcome, Student #{sess['student_id']}</h2>
-                </div>
-                <div style='text-align:right; background:rgba(79,158,255,0.1); padding:0.8rem 1.2rem; border-radius:12px; border:1px solid rgba(79,158,255,0.2);'>
-                    <div style='font-size:0.7rem; color:#4f9eff; font-weight:800; text-transform:uppercase;'>Session Timer</div>
-                    <div style='font-size:1.4rem; font-weight:800; font-family:monospace; color:#f0f4ff;'>{mins:02d}:{secs:02d}</div>
-                </div>
+        <div class='hub-header' style='display:flex; align-items:center; gap:2rem;'>
+            <div style='flex-shrink:0;'>
+                <div style='width:100px; height:100px; border-radius:50%; border:4px solid #4f9eff; 
+                     background-image:url("{photo_url if photo_url else 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200&h=200'}"); 
+                     background-size:cover; background-position:center;
+                     box-shadow: 0 4px 15px rgba(79,158,255,0.3);'></div>
             </div>
-            <div style='display:flex; justify-content:space-between; font-size:0.85rem; color:rgba(200,210,240,0.65); margin-bottom:0.3rem; margin-top:1.5rem;'>
-                <span>{completed} of {total} modules completed</span><span>{pct}%</span>
-            </div>
-            <div class='progress-bar-wrap'>
-                <div style='height:6px; border-radius:999px; background:linear-gradient(90deg,#4f9eff,#a78bfa); width:{pct}%;'></div>
+            <div style='flex-grow:1;'>
+                <div style='display:flex; justify-content:space-between; align-items:center;'>
+                    <div>
+                        <div style='font-size:0.78rem; font-weight:800; color:#4f9eff; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.4rem;'>Learning Journey</div>
+                        <h2 style='margin-bottom:0;'>Welcome, Student #{sess['student_id']}</h2>
+                    </div>
+                    <div style='text-align:right; background:rgba(79,158,255,0.1); padding:0.8rem 1.2rem; border-radius:12px; border:1px solid rgba(79,158,255,0.2);'>
+                        <div style='font-size:0.7rem; color:#4f9eff; font-weight:800; text-transform:uppercase;'>Session Timer</div>
+                        <div style='font-size:1.4rem; font-weight:800; font-family:monospace; color:#f0f4ff;'>{mins:02d}:{secs:02d}</div>
+                    </div>
+                </div>
+                <div style='display:flex; justify-content:space-between; font-size:0.85rem; color:rgba(200,210,240,0.65); margin-bottom:0.3rem; margin-top:1.5rem;'>
+                    <span>{completed} of {total} modules completed</span><span>{pct}%</span>
+                </div>
+                <div class='progress-bar-wrap'>
+                    <div style='height:6px; border-radius:999px; background:linear-gradient(90deg,#4f9eff,#a78bfa); width:{pct}%;'></div>
+                </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-        # Fetch pending recommendations to highlight modules
-        recommended_module_ids = set()
+        # Fetch modules that have active recommendations and their suggested video durations
+        recommended_mod_info = {} # {module_id: duration}
         try:
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT DISTINCT recommended_video_id FROM recommendations 
-                WHERE student_id = ? AND status = 'pending'
+                SELECT r.module_id, v.duration FROM recommendations r
+                JOIN video_library v ON r.recommended_video_id = v.video_id
+                WHERE r.student_id = ? AND r.status = 'pending'
             """, (int(sess["student_id"]),))
-            recommended_module_ids = {row[0] for row in cursor.fetchall()}
+            recommended_mod_info = {row[0]: row[1] for row in cursor.fetchall()}
             conn.close()
         except:
             pass
@@ -266,8 +427,11 @@ def run_student_evaluation_hub():
         cols = st.columns(2)
         for i, mod in enumerate(VIDEO_MODULES):
             is_done = mod["id"] in sess["completed_modules"]
-            is_recommended = mod["id"] in recommended_module_ids
-            score_text = f"Score: {sess['scores'].get(mod['id'], '-')}/15" if is_done else ""
+            is_recommended = mod["id"] in recommended_mod_info
+            score_text = f"Score: {int(sess['scores'].get(mod['id'], 0))}%" if is_done else ""
+            
+            # Use recommended video duration if available
+            display_duration = recommended_mod_info.get(mod["id"], mod["duration"])
             
             # Determine card border style
             border_style = "border-color:#00D4AA; box-shadow:0 0 15px rgba(0,212,170,0.15);" if is_recommended else ""
@@ -281,7 +445,7 @@ def run_student_evaluation_hub():
 <div style='font-size:1.1rem; font-weight:800; color:var(--text); margin-bottom:0.7rem;'>{mod['title']}</div>
 <span class='{'badge-done' if is_done else 'badge-pending'}'>{'✅ Completed' if is_done else '⏳ Pending'}</span>
 {'&nbsp;&nbsp;<span style="color:var(--text-muted);font-size:0.85rem;">' + score_text + '</span>' if score_text else ''}
-<div style='margin-top:0.5rem; color:var(--text-muted); font-size:0.82rem;'>⏱ {mod['duration']}</div>
+<div style='margin-top:0.5rem; color:var(--text-muted); font-size:0.82rem;'>⏱ {display_duration}</div>
 </div>""", unsafe_allow_html=True)
                 
                 if is_recommended and is_done:
@@ -350,24 +514,35 @@ def run_student_evaluation_hub():
         
         # Check if there's a recommended replacement video for this module (triggered when student struggled here)
         video_url = mod["url"]
+        active_quiz = mod["quiz"] # Default
+        
+        conn = get_connection()
+        cursor = conn.cursor()
         cursor.execute("""
-            SELECT v.youtube_url, v.title FROM recommendations r
+            SELECT v.youtube_url, v.title, v.quiz_json FROM recommendations r
             JOIN video_library v ON r.recommended_video_id = v.video_id
             WHERE r.student_id = ? AND r.module_id = ? AND r.status = 'pending'
             ORDER BY r.timestamp DESC LIMIT 1
         """, (sess["student_id"], mod['id']))
-        rec_video = cursor.fetchone()
+        rec_data = cursor.fetchone()
         conn.close()
 
-        if rec_video:
-            video_url = rec_video[0]
+        if rec_data:
+            video_url = rec_data[0]
+            import json
+            if rec_data[2]:
+                try:
+                    active_quiz = json.loads(rec_data[2])
+                except:
+                    pass
+            
             st.markdown(f"""
             <div style='background:rgba(0,212,170,0.08); border:1px solid #00D4AA; border-radius:10px;
                 padding:0.9rem 1.2rem; margin-bottom:1rem; display:flex; align-items:center; gap:0.8rem;'>
                 <span style='font-size:1.4rem;'>🔁</span>
                 <div>
-                    <div style='font-weight:800; color:#00D4AA; font-size:0.85rem;'>Recommended Video</div>
-                    <div style='color:var(--text-soft); font-size:0.9rem;'><strong>{rec_video[1]}</strong> — selected based on your previous performance in this module.</div>
+                    <div style='font-weight:800; color:#00D4AA; font-size:0.85rem;'>Recommended Alternative Path</div>
+                    <div style='color:var(--text-soft); font-size:0.9rem;'><strong>{rec_data[1]}</strong> — selected based on your previous performance. A tailored quiz will be loaded below.</div>
                 </div>
             </div>""", unsafe_allow_html=True)
 
@@ -435,7 +610,7 @@ def run_student_evaluation_hub():
 
         st.markdown("<div class='quiz-container'>", unsafe_allow_html=True)
         st.markdown("<h3 style='margin-bottom:0.3rem;'>📝 Comprehensive Final Quiz</h3>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color:rgba(200,210,240,0.65); font-size:0.9rem; margin-bottom:1.5rem;'>Answer all 15 questions based on the video content above.</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:rgba(200,210,240,0.65); font-size:0.9rem; margin-bottom:1.5rem;'>Answer all {len(active_quiz)} questions based on the video content above.</p>", unsafe_allow_html=True)
 
         if "user_answers_cache" not in sess:
             sess["user_answers_cache"] = {}
@@ -443,8 +618,8 @@ def run_student_evaluation_hub():
             sess["user_answers_cache"][mod["id"]] = {}
 
         user_answers = {}
-        for idx, q in enumerate(mod["quiz"]):
-            st.markdown(f"<div style='font-size:0.78rem; font-weight:700; color:#4f9eff; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.2rem;'>Question {idx+1} of 15</div>", unsafe_allow_html=True)
+        for idx, q in enumerate(active_quiz):
+            st.markdown(f"<div style='font-size:0.78rem; font-weight:700; color:#4f9eff; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.2rem;'>Question {idx+1} of {len(active_quiz)}</div>", unsafe_allow_html=True)
             
             # Determine default index if previously answered
             default_val = sess["user_answers_cache"][mod["id"]].get(idx)
@@ -470,10 +645,11 @@ def run_student_evaluation_hub():
 
         if st.button("✅  Submit Quiz & Feedback", type="primary", width='stretch'):
             if any(ans is None for ans in user_answers.values()):
-                st.error("Please answer all 15 questions before submitting.")
+                st.error(f"Please answer all {len(active_quiz)} questions before submitting.")
             else:
-                score = sum(1 for i, q in enumerate(mod["quiz"]) if user_answers[i] == q["a"])
-                sess["scores"][mod["id"]] = score
+                score = sum(1 for i, q in enumerate(active_quiz) if user_answers[i] == q["a"])
+                score_pct = (score / len(active_quiz)) * 100
+                sess["scores"][mod["id"]] = score_pct
                 sess["user_answers_cache"][mod["id"]] = user_answers
                 if mod["id"] not in sess["completed_modules"]:
                     sess["completed_modules"].append(mod["id"])
@@ -494,9 +670,10 @@ def run_student_evaluation_hub():
                     UPDATE adaptivity_log 
                     SET post_score = ? 
                     WHERE student_id = ? AND module_id = ? AND post_score IS NULL
-                """, (score, sess["student_id"], mod["id"]))
+                """, (score_pct, sess["student_id"], mod["id"]))
                 conn.commit()
                 conn.close()
+                
                 # Calculate time spent on this module accurately
                 module_mins = 0
                 if "module_start_time" in sess:
@@ -513,20 +690,32 @@ def run_student_evaluation_hub():
                         modules_completed = modules_completed + 1,
                         quiz_score = (quiz_score + ?) / 2.0
                     WHERE student_id = ?
-                """, (module_hours, (score/15)*100, sess["student_id"]))
+                """, (module_hours, score_pct, sess["student_id"]))
                 conn.commit()
+                
+                # SYNC DATA TO OTHER DBs & CSV
+                from db_utils import sync_student_data
+                cursor.execute("SELECT * FROM students WHERE student_id = ?", (sess["student_id"],))
+                updated_row = cursor.fetchone()
+                if updated_row:
+                    updated_df = pd.DataFrame([dict(zip([column[0] for column in cursor.description], updated_row))])
+                    sync_student_data(sess["student_id"], updated_df)
+                
                 conn.close()
                 
                 # Generate Personalized Recommendations
-                recs = generate_recommendations(sess["student_id"], mod["id"], (score/15)*100, sentiment_label)
+                recs = generate_recommendations(sess["student_id"], mod["id"], score_pct, sentiment_label)
                 sess["last_recs"] = recs
                 
-                sess["current_step"] = "Learning"
-                pct = int((score / 15) * 100)
-                st.success(f"🎉 Module complete! You scored **{score}/15** ({pct}%)")
-                if recs:
-                    st.info(f"💡 New recommendation generated: {recs[0]['text']}")
-                st.rerun()
+                log_activity(sess["student_id"], "Quiz Completed", f"Finished Module {mod['id']} with {int(score_pct)}% score")
+                
+                st.success(f"🎉 Module complete! You scored **{score}/{len(active_quiz)}** ({int(score_pct)}%)")
+                st.info("Performance data has been synced to the Analytics Matrix.")
+                
+                if st.button("Continue to Next Module", type="primary", key="btn_next_mod"):
+                    sess["current_step"] = "Learning"
+                    st.rerun()
+                st.stop()
         st.markdown("</div>", unsafe_allow_html=True)
 
     elif sess["current_step"] == "Finished":
@@ -549,6 +738,9 @@ def run_student_evaluation_hub():
             if col_a.button("📊 Yes, Analytics Hub", type="primary", width='stretch'):
                 st.session_state.last_eval_student_id = sess["student_id"]
                 st.session_state.app_mode = "Option 2"
+                # Clear cache for the student who just finished
+                if "prediction_result" in st.session_state:
+                    del st.session_state.prediction_result
                 st.rerun()
                 
             if col_b.button("🏠 No, Logout", width='stretch'):
@@ -570,7 +762,7 @@ def run_student_evaluation_hub():
 
 def render_official_report_card(sess):
     """Render a premium HTML report card for the student."""
-    avg_score = sum(sess["scores"].values()) / (len(VIDEO_MODULES) * 15) * 100
+    avg_score = sum(sess["scores"].values()) / len(sess["scores"]) if sess["scores"] else 0
     level = "ELITE" if avg_score > 85 else "PROFICIENT" if avg_score > 60 else "DEVELOPING"
     color = "#3dd68c" if level == "ELITE" else "#4f9eff" if level == "PROFICIENT" else "#f5c542"
     
@@ -604,8 +796,7 @@ def render_official_report_card(sess):
 
 def export_student_data_to_excel(sess):
     """Map results to model variables and export as per promp.txt."""
-    total_quiz_score = sum(sess["scores"].values())
-    avg_quiz_score = (total_quiz_score / (len(VIDEO_MODULES) * 15)) * 100
+    avg_quiz_score = sum(sess["scores"].values()) / len(sess["scores"]) if sess["scores"] else 0
     
     # Mock assignment score for model compatibility
     avg_assign_score = 100.0
@@ -661,31 +852,9 @@ def export_student_data_to_excel(sess):
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     
-    # Automate integration with the Prediction DB
-    try:
-        import os
-        if os.path.exists(DATA_PATH):
-            main_db = pd.read_csv(DATA_PATH)
-            main_db = main_db[main_db["student_id"] != int_id]
-            append_df = df_new.drop(columns=["timestamp"], errors="ignore")
-            main_db = pd.concat([main_db, append_df], ignore_index=True)
-            main_db.to_csv(DATA_PATH, index=False)
-    except Exception as e:
-        st.error(f"Failed to sync with CSV: {e}")
-
-    # Sync student into SQLite databases so Analytics Matrix can find them
-    from db_utils import get_connection, PRESCRIPTIVE_DB
-    for db_file in ["edugrowth.db", PRESCRIPTIVE_DB]:
-        try:
-            conn = get_connection(db_file)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM students WHERE student_id = ?", (int_id,))
-            insert_df = df_new.drop(columns=["timestamp"], errors="ignore")
-            insert_df.to_sql("students", conn, if_exists="append", index=False)
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            st.warning(f"DB sync warning ({db_file}): {e}")
+    # Automate integration with the Prediction DB and SQLite
+    from db_utils import sync_student_data
+    sync_student_data(int_id, df_new)
 
     # Save locally for Option 2 reflection
     df_new.to_csv(f"eval_student_{int_id}.csv", index=False)
@@ -1143,19 +1312,27 @@ def show_student_profile(row, prediction, model_name):
     st.markdown(
         f"""
         <div class="profile-hero">
-            <div class="profile-row">
-                <div>
+            <div class="profile-row" style="display:flex; align-items:center; gap:2.5rem;">
+                <div style="flex-shrink:0;">
+                    <div style='width:120px; height:120px; border-radius:50%; border:4px solid #4f9eff; 
+                         background-image:url("{row.get("profile_photo", "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=200&h=200")}"); 
+                         background-size:cover; background-position:center;
+                         box-shadow: 0 4px 15px rgba(79,158,255,0.3);'></div>
+                </div>
+                <div style="flex-grow:1;">
                     <div class="profile-name">Student #{int(row.get("student_id", 0))}</div>
                     <div class="profile-meta">
                         Region: {escape_html(row.get("region", "N/A"))} &nbsp;|&nbsp;
                         Model: {escape_html(model_name)} &nbsp;|&nbsp;
                         Actual: {escape_html(actual_performance)}
                     </div>
-                    <span class="status-pill {health_class}">Profile Health: {escape_html(health_status)}</span>
-                    <span class="status-pill status-watch">Trend: {escape_html(trend)}</span>
-                    <span class="status-pill {prediction_class}">Prediction: {escape_html(prediction)}</span>
+                    <div style="margin-top:0.8rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <span class="status-pill {health_class}">Profile Health: {escape_html(health_status)}</span>
+                        <span class="status-pill status-watch">Trend: {escape_html(trend)}</span>
+                        <span class="status-pill {prediction_class}">Prediction: {escape_html(prediction)}</span>
+                    </div>
                 </div>
-                <div class="profile-score">
+                <div class="profile-score" style="text-align:right;">
                     <div class="profile-meta">Overall Profile Health</div>
                     <div class="profile-score-value">{health_score:.1f}%</div>
                 </div>
@@ -2265,6 +2442,12 @@ def main():
             st.session_state.prediction_result = None
             st.session_state.active_context_key = active_context_key
 
+        # Display student photo
+        s_row = df[df["student_id"] == int(student_id)]
+        if not s_row.empty:
+            render_profile_photo(s_row.iloc[0].get("profile_photo"), size=90)
+            st.markdown(f"<div style='text-align:center; font-weight:800; color:#fff; margin-bottom:1rem;'>Student #{int(student_id)}</div>", unsafe_allow_html=True)
+
         predict_clicked = st.button("Predict Performance", type="primary")
         st.divider()
         st.metric("Students", f"{len(df):,}")
@@ -2465,6 +2648,7 @@ def show_recommendations_accuracy(student_id):
 
     # Statistical significance
     if not df_logs.empty and len(df_logs) >= 2:
+        df_logs['Entry'] = [f"Rec {i+1}" for i in range(len(df_logs))]
         from scipy import stats
         pre = df_logs['pre_score'].dropna().tolist()
         post = df_logs['post_score'].dropna().tolist()
@@ -2484,15 +2668,30 @@ def show_recommendations_accuracy(student_id):
             effect_label = "Large" if abs(d) > 0.8 else "Medium" if abs(d) > 0.5 else "Small"
             st.markdown(f"**Result:** {sig} &nbsp;·&nbsp; Effect size: **{effect_label}** (d={d:.2f})")
 
+        # Side-by-Side Comparison Chart
+        st.subheader("📈 Performance Shift Analysis")
+        chart_data = pd.melt(df_logs[['Entry', 'pre_score', 'post_score']], id_vars=['Entry'], 
+                             value_vars=['pre_score', 'post_score'],
+                             var_name='Phase', value_name='Score')
+        chart_data['Phase'] = chart_data['Phase'].map({'pre_score': 'Before', 'post_score': 'After'})
+        
+        comparison_chart = alt.Chart(chart_data).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
+            x=alt.X('Phase:N', title=None, sort=['Before', 'After']),
+            y=alt.Y('Score:Q', title='Average Score'),
+            color=alt.Color('Phase:N', scale=alt.Scale(domain=['Before', 'After'], range=['#FFB020', '#00D4AA']), legend=None),
+            column=alt.Column('Entry:N', title='Intervention History'),
+            tooltip=['Entry', 'Phase', 'Score']
+        ).properties(height=280, width=80)
+        st.altair_chart(comparison_chart)
+
         # Per-recommendation improvement bar chart
         df_logs['Improvement'] = df_logs['post_score'] - df_logs['pre_score']
-        df_logs['Entry'] = [f"Rec {i+1}" for i in range(len(df_logs))]
         chart = alt.Chart(df_logs).mark_bar(cornerRadiusTopLeft=6, cornerRadiusTopRight=6).encode(
             x=alt.X('Entry:N', title='Recommendation'),
             y=alt.Y('Improvement:Q', title='Score Improvement'),
             color=alt.condition(alt.datum.Improvement > 0, alt.value('#00D4AA'), alt.value('#FF4D6A')),
             tooltip=['Entry','pre_score','post_score','Improvement']
-        ).properties(height=250, title='Per-Recommendation Score Change')
+        ).properties(height=250, title='Individual Recommendation Net Impact')
         st.altair_chart(chart, width='stretch')
     else:
         st.info("Complete at least one recommended module to see statistical analysis.")

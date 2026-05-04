@@ -49,9 +49,9 @@ def generate_recommendations(student_id, module_id, quiz_score, sentiment_label=
         full_rec_text = f"{rec_text} Suggested resource: {title}"
         
         # Save recommendation to BOTH DBs
-        from db_utils import PRESCRIPTIVE_DB
-        for db_file in [get_connection(), get_connection(PRESCRIPTIVE_DB)]:
-            db_conn = db_file
+        from db_utils import DB_NAME, PRESCRIPTIVE_DB
+        for db_name in [DB_NAME, PRESCRIPTIVE_DB]:
+            db_conn = get_connection(db_name)
             cursor_db = db_conn.cursor()
             cursor_db.execute("""
                 INSERT INTO recommendations (student_id, module_id, recommendation_text, recommended_video_id)
