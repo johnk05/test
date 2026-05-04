@@ -4,3 +4,4 @@ altair
 joblib
 scikit-learn
 xlsxwriter
+streamlit-player
