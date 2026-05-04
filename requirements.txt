@@ -6,3 +6,4 @@ scikit-learn
 xlsxwriter
 streamlit-player
 textblob
+vaderSentiment
